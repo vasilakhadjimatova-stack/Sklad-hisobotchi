@@ -31,9 +31,14 @@ export async function POST(req: NextRequest) {
       const newQty = isTake ? item.quantity - entry.quantity : item.quantity + entry.quantity
       if (isTake && newQty < 0) continue // Skip if not enough stock for TAKE
 
+      const updateData: any = { quantity: newQty }
+      if (!isTake && entry.totalPrice > 0 && entry.quantity > 0) {
+        updateData.price = Math.round(entry.totalPrice / entry.quantity)
+      }
+
       await prisma.item.update({
         where: { id: entry.itemId },
-        data: { quantity: newQty }
+        data: updateData
       })
 
       await prisma.transaction.create({

@@ -14,6 +14,7 @@ type Item = {
 type SelectedItem = {
   item: Item
   qty: number
+  newTotalPrice?: string
 }
 
 type Step = 'event' | 'items' | 'confirm' | 'done' | 'error'
@@ -155,7 +156,12 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
     }))
   }
 
-  const totalCost = selected.reduce((sum, s) => sum + s.item.price * s.qty, 0)
+  const totalCost = selected.reduce((sum, s) => {
+    if (actionType === 'ADD') {
+      return sum + (parseInt(s.newTotalPrice || '0', 10) || 0)
+    }
+    return sum + s.item.price * s.qty
+  }, 0)
 
   const handleSubmit = async () => {
     if (!eventName.trim()) { setStep('event'); return }
@@ -175,7 +181,7 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
           items: selected.map(s => ({
             itemId: s.item.id,
             quantity: s.qty,
-            totalPrice: s.item.price * s.qty
+            totalPrice: actionType === 'ADD' ? (parseInt(s.newTotalPrice || '0', 10) || 0) : (s.item.price * s.qty)
           }))
         })
       })
@@ -414,9 +420,24 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-zinc-900 text-base tracking-tight" suppressHydrationWarning>
-                        {(s.item.price * s.qty).toLocaleString()} UZS
-                      </div>
+                      {actionType === 'ADD' ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-widest">Jami Summa (UZS)</label>
+                          <input 
+                            type="number"
+                            placeholder="Summa..."
+                            value={s.newTotalPrice || ''}
+                            onChange={(e) => {
+                              setSelected(prev => prev.map(p => p.item.id === s.item.id ? { ...p, newTotalPrice: e.target.value } : p))
+                            }}
+                            className="w-28 text-right bg-white/50 border border-zinc-200 shadow-inner rounded-lg py-1 px-2 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+                          />
+                        </div>
+                      ) : (
+                        <div className="font-bold text-zinc-900 text-base tracking-tight" suppressHydrationWarning>
+                          {(s.item.price * s.qty).toLocaleString()} UZS
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
