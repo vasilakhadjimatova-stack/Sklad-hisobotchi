@@ -22,7 +22,11 @@ const genAI = new GoogleGenerativeAI(geminiKey || '');
 
 bot.start(async (ctx) => {
   if (ctx.chat.type !== 'private') {
-    return ctx.reply("Assalomu alaykum! Sklad bot guruhga qo'shildi.\nIshlatish uchun shaxsiy xabarda yozing yoki guruhda /chiqim buyrug'idan foydalaning.");
+    return ctx.reply("Assalomu alaykum! Sklad bot guruhga qo'shildi.\nQuyidagi tugma orqali mahsulotlarni to'g'ridan-to'g'ri kiritishingiz mumkin:",
+      Markup.inlineKeyboard([
+        [Markup.button.webApp('📦 Chiqim / Kirim', miniAppUrl)]
+      ])
+    );
   }
 
   const telegramId = String(ctx.from.id);
@@ -88,7 +92,11 @@ async function processGeminiResponse(ctx: any, msg: any, result: any) {
     }
 
     if (parsedData.error) {
-      return ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, undefined, '❌ ' + parsedData.error);
+      return ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, undefined, '❌ ' + parsedData.error + '\n\nYoki quyidagi tugma orqali oson kiriting:',
+        Markup.inlineKeyboard([
+          [Markup.button.webApp('📦 Dastur orqali kiritish', miniAppUrl)]
+        ])
+      );
     }
 
     const { action, itemName, quantity, eventName } = parsedData;
@@ -107,7 +115,8 @@ async function processGeminiResponse(ctx: any, msg: any, result: any) {
       confirmMsg, 
       Markup.inlineKeyboard([
         [Markup.button.callback('✅ Tasdiqlash', `confirm_tx_${txId}`)],
-        [Markup.button.callback('❌ Bekor qilish', 'cancel_tx')]
+        [Markup.button.callback('❌ Bekor qilish', 'cancel_tx')],
+        [Markup.button.webApp('📦 Mini App', miniAppUrl)]
       ])
     );
 }
