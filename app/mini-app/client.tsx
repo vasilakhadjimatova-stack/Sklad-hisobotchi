@@ -75,8 +75,8 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
 
   if (!mounted) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0f0f13', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: 'white', opacity: 0.4, fontSize: 14 }}>Yuklanmoqda...</div>
+      <div className="min-h-screen bg-[#f4f4f5] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-4 border-brand-500 border-t-transparent animate-spin"></div>
       </div>
     )
   }
@@ -144,266 +144,283 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f0f13] text-zinc-900 font-sans" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div className="min-h-screen bg-[#f4f4f5] text-zinc-900 font-sans relative overflow-x-hidden selection:bg-brand-500/30">
       
-      {/* Header */}
-      <div className="sticky top-0 z-20 bg-[#0f0f13]/95 backdrop-blur-sm border-b border-white/60 px-5 py-4">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-            <Package size={18} className="text-indigo-400" />
-          </div>
-          <div>
-            <h1 className="font-bold text-base text-zinc-900 leading-tight">Chiqim kiritish</h1>
-            <p className="text-[11px] text-zinc-900/30">{displayName || 'Impulse Sklad'}</p>
-          </div>
-        </div>
-
-        {/* Step indicators */}
-        <div className="flex items-center gap-2 mt-4">
-          {['event', 'items', 'confirm'].map((s, i) => (
-            <React.Fragment key={s}>
-              <div className={`h-1.5 flex-1 rounded-full transition-all ${
-                step === 'done' ? 'bg-emerald-500' :
-                ['event', 'items', 'confirm'].indexOf(step) >= i ? 'bg-indigo-500' : 'bg-white/10'
-              }`} />
-            </React.Fragment>
-          ))}
-        </div>
+      {/* Animated Background Blobs */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-5%] left-[-10%] w-[60%] h-[40%] bg-brand-500/15 rounded-full blur-[80px] animate-blob"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[50%] h-[50%] bg-rose-500/15 rounded-full blur-[80px] animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-[-10%] left-[10%] w-[50%] h-[50%] bg-violet-500/15 rounded-full blur-[80px] animate-blob animation-delay-4000"></div>
       </div>
 
-      <div className="px-5 py-6">
-
-        {/* STEP 1: Event Name */}
-        {step === 'event' && (
-          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="relative z-10">
+        {/* Header */}
+        <div className="sticky top-0 z-30 bg-white/60 backdrop-blur-xl border-b border-white/80 shadow-sm px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center shadow-inner">
+              <Package size={20} className="text-brand-500" />
+            </div>
             <div>
-              <h2 className="text-xl font-black text-zinc-900 mb-1">Qaysi tadbir uchun?</h2>
-              <p className="text-zinc-900/40 text-sm">Tadbir nomi yoki "Impulse" ni kiriting</p>
+              <h1 className="font-bold text-lg text-zinc-900 leading-tight">Chiqim kiritish</h1>
+              <p className="text-xs font-medium text-zinc-500">{displayName || 'Impulse Sklad'}</p>
             </div>
-
-            {/* If Telegram didn't provide name - ask manually */}
-            {!tgUser && (
-              <div>
-                <label className="block text-zinc-900/40 text-[10px] font-bold uppercase tracking-widest mb-2 ml-1">Ismingiz</label>
-                <input
-                  type="text"
-                  placeholder="Ismi familyangizni kiriting..."
-                  value={manualName}
-                  onChange={e => setManualName(e.target.value)}
-                  className="w-full bg-white/40 border border-white/60 rounded-2xl py-4 px-5 text-zinc-900 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                />
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {['Impulse', 'Assodiq', 'Nodir aka', 'Hamza'].map(preset => (
-                <button
-                  key={preset}
-                  onClick={() => setEventName(preset)}
-                  className={`w-full text-left px-5 py-4 rounded-2xl border transition-all font-bold ${
-                    eventName === preset
-                      ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-300'
-                      : 'bg-white/40 border-white/60 text-zinc-900/70 active:bg-white/10'
-                  }`}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Boshqa tadbir nomini yozing..."
-                value={!['Impulse', 'Assodiq', 'Nodir aka', 'Hamza'].includes(eventName) ? eventName : ''}
-                onChange={e => setEventName(e.target.value)}
-                className="w-full bg-white/40 border border-white/60 rounded-2xl py-4 px-5 text-zinc-900 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-              />
-            </div>
-
-            <button
-              onClick={() => {
-                const nameOk = tgUser || manualName.trim()
-                if (eventName.trim() && nameOk) {
-                  // Save name for future visits
-                  if (!tgUser && manualName.trim()) {
-                    localStorage.setItem('sklad_user_name', manualName.trim())
-                  }
-                  setStep('items')
-                }
-              }}
-              disabled={!eventName.trim() || (!tgUser && !manualName.trim())}
-              className="w-full py-4 rounded-2xl bg-indigo-500 text-zinc-900 font-black text-sm uppercase tracking-widest disabled:opacity-30 active:bg-indigo-600 transition-all flex items-center justify-center gap-2"
-            >
-              Davom etish <ChevronRight size={18} />
-            </button>
           </div>
-        )}
 
-        {/* STEP 2: Select Items */}
-        {step === 'items' && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div>
-              <h2 className="text-xl font-black text-zinc-900 mb-1">Mahsulotlarni tanlang</h2>
-              <p className="text-zinc-900/40 text-sm">Tadbir: <span className="text-indigo-400 font-bold">{eventName}</span></p>
-            </div>
+          {/* Step indicators */}
+          <div className="flex items-center gap-2 mt-4">
+            {['event', 'items', 'confirm'].map((s, i) => (
+              <React.Fragment key={s}>
+                <div className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                  step === 'done' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' :
+                  ['event', 'items', 'confirm'].indexOf(step) >= i ? 'bg-brand-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-zinc-900/10'
+                }`} />
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
 
-            <div className="relative">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-900/20" />
-              <input
-                type="text"
-                placeholder="Qidirish..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full bg-white/40 border border-white/60 rounded-2xl py-3 pl-10 pr-5 text-zinc-900 placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm"
-              />
-            </div>
+        <div className="px-5 py-6">
 
-            <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-1">
-              {filteredItems.map(item => {
-                const sel = selected.find(s => s.item.id === item.id)
-                return (
-                  <div
-                    key={item.id}
-                    className={`rounded-2xl border transition-all ${
-                      sel
-                        ? 'bg-indigo-500/10 border-indigo-500/40'
-                        : 'bg-white/40 border-white/60'
+          {/* STEP 1: Event Name */}
+          {step === 'event' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div>
+                <h2 className="text-2xl font-bold text-zinc-900 mb-1 tracking-tight">Qaysi tadbir uchun?</h2>
+                <p className="text-zinc-500 text-sm font-medium">Tadbir nomini tanlang yoki kiriting</p>
+              </div>
+
+              {/* If Telegram didn't provide name - ask manually */}
+              {!tgUser && (
+                <div className="space-y-2">
+                  <label className="block text-zinc-500 text-xs font-bold uppercase tracking-widest ml-1">Ismingiz</label>
+                  <input
+                    type="text"
+                    placeholder="Ismi familyangizni kiriting..."
+                    value={manualName}
+                    onChange={e => setManualName(e.target.value)}
+                    className="w-full bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl py-4 px-5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {['Impulse', 'Assodiq', 'Nodir aka', 'Hamza'].map(preset => (
+                  <button
+                    key={preset}
+                    onClick={() => setEventName(preset)}
+                    className={`w-full text-left px-5 py-4 rounded-2xl border transition-all duration-200 font-bold shadow-sm ${
+                      eventName === preset
+                        ? 'bg-brand-500/10 border-brand-500/30 text-brand-600 shadow-[0_4px_15px_rgba(99,102,241,0.1)]'
+                        : 'bg-white/60 backdrop-blur-md border-white/80 text-zinc-700 hover:bg-white/80 active:scale-[0.98]'
                     }`}
                   >
-                    <button
-                      onClick={() => toggleItem(item)}
-                      className="w-full text-left p-4 flex justify-between items-center"
+                    {preset}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Boshqa tadbir nomini yozing..."
+                  value={!['Impulse', 'Assodiq', 'Nodir aka', 'Hamza'].includes(eventName) ? eventName : ''}
+                  onChange={e => setEventName(e.target.value)}
+                  className="w-full bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl py-4 px-5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium"
+                />
+              </div>
+
+              <button
+                onClick={() => {
+                  const nameOk = tgUser || manualName.trim()
+                  if (eventName.trim() && nameOk) {
+                    if (!tgUser && manualName.trim()) {
+                      localStorage.setItem('sklad_user_name', manualName.trim())
+                    }
+                    setStep('items')
+                  }
+                }}
+                disabled={!eventName.trim() || (!tgUser && !manualName.trim())}
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-500 to-violet-500 text-white font-bold text-sm uppercase tracking-widest disabled:opacity-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(99,102,241,0.3)] mt-8"
+              >
+                Davom etish <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
+
+          {/* STEP 2: Select Items */}
+          {step === 'items' && (
+            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div>
+                <h2 className="text-2xl font-bold text-zinc-900 mb-1 tracking-tight">Mahsulotlar</h2>
+                <p className="text-zinc-500 text-sm font-medium">Tadbir: <span className="text-brand-500 font-bold">{eventName}</span></p>
+              </div>
+
+              <div className="relative">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Qidirish..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl py-3.5 pl-11 pr-5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium text-sm"
+                />
+              </div>
+
+              <div className="space-y-3 pb-24">
+                {filteredItems.map(item => {
+                  const sel = selected.find(s => s.item.id === item.id)
+                  return (
+                    <div
+                      key={item.id}
+                      className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                        sel
+                          ? 'bg-brand-500/5 border-brand-500/30 shadow-[0_4px_15px_rgba(99,102,241,0.05)]'
+                          : 'bg-white/60 backdrop-blur-md border-white/80 shadow-sm'
+                      }`}
                     >
-                      <div>
-                        <div className={`font-bold text-sm ${sel ? 'text-indigo-300' : 'text-zinc-900/80'}`}>{item.name}</div>
-                        <div className="text-[11px] text-zinc-900/30 mt-0.5">{item.quantity} {item.unit.toLowerCase()} qoldi</div>
-                      </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                        sel ? 'bg-indigo-500 border-indigo-500' : 'border-white/20'
-                      }`}>
-                        {sel && <Check size={12} className="text-zinc-900" strokeWidth={3} />}
-                      </div>
-                    </button>
+                      <button
+                        onClick={() => toggleItem(item)}
+                        className="w-full text-left p-4 flex justify-between items-center active:bg-zinc-900/5 transition-colors"
+                      >
+                        <div>
+                          <div className={`font-bold text-base tracking-tight ${sel ? 'text-brand-600' : 'text-zinc-800'}`}>{item.name}</div>
+                          <div className="text-xs font-medium text-zinc-500 mt-1">{item.quantity} {item.unit.toLowerCase()} qoldi</div>
+                        </div>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                          sel ? 'bg-brand-500 border-none' : 'border-2 border-zinc-300'
+                        }`}>
+                          {sel && <Check size={14} className="text-white" strokeWidth={3} />}
+                        </div>
+                      </button>
 
-                    {sel && (
-                      <div className="px-4 pb-4 flex items-center gap-4 animate-in fade-in duration-150">
-                        <button
-                          onClick={() => changeQty(item.id, -1)}
-                          className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20"
-                        >
-                          <Minus size={16} />
-                        </button>
-                        <span className="flex-1 text-center font-black text-lg text-zinc-900">
-                          {sel.qty} <span className="text-xs text-zinc-900/30 font-normal">{item.unit.toLowerCase()}</span>
-                        </span>
-                        <button
-                          onClick={() => changeQty(item.id, 1)}
-                          className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center active:bg-white/20"
-                        >
-                          <Plus size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-
-            <button
-              onClick={() => selected.length > 0 && setStep('confirm')}
-              disabled={selected.length === 0}
-              className="w-full py-4 rounded-2xl bg-indigo-500 text-zinc-900 font-black text-sm uppercase tracking-widest disabled:opacity-30 active:bg-indigo-600 transition-all flex items-center justify-center gap-2 sticky bottom-4"
-            >
-              Davom etish ({selected.length} ta) <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
-
-        {/* STEP 3: Confirm */}
-        {step === 'confirm' && (
-          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div>
-              <h2 className="text-xl font-black text-zinc-900 mb-1">Tasdiqlang</h2>
-              <p className="text-zinc-900/40 text-sm">Tadbir: <span className="text-indigo-400 font-bold">{eventName}</span></p>
-            </div>
-
-            <div className="space-y-3">
-              {selected.map(s => (
-                <div key={s.item.id} className="bg-white/40 border border-white/60 rounded-2xl p-4 flex justify-between items-center">
-                  <div>
-                    <div className="font-bold text-zinc-900 text-sm">{s.item.name}</div>
-                    <div className="text-rose-400 font-black text-xs mt-0.5">-{s.qty} {s.item.unit.toLowerCase()}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-black text-zinc-900 text-sm" suppressHydrationWarning>
-                      {(s.item.price * s.qty).toLocaleString()} UZS
+                      {sel && (
+                        <div className="px-4 pb-4 pt-1 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                          <button
+                            onClick={() => changeQty(item.id, -1)}
+                            className="w-10 h-10 rounded-xl bg-white shadow-sm border border-zinc-200 flex items-center justify-center active:scale-95 transition-all text-zinc-600 hover:bg-zinc-50"
+                          >
+                            <Minus size={18} />
+                          </button>
+                          <span className="flex-1 text-center font-bold text-xl text-zinc-900">
+                            {sel.qty} <span className="text-sm text-zinc-500 font-medium">{item.unit.toLowerCase()}</span>
+                          </span>
+                          <button
+                            onClick={() => changeQty(item.id, 1)}
+                            className="w-10 h-10 rounded-xl bg-white shadow-sm border border-zinc-200 flex items-center justify-center active:scale-95 transition-all text-zinc-600 hover:bg-zinc-50"
+                          >
+                            <Plus size={18} />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                  )
+                })}
+              </div>
 
-            <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-5">
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-900/50 text-sm font-medium">Jami rasxod</span>
-                <span className="text-indigo-400 font-black text-xl" suppressHydrationWarning>
-                  {totalCost.toLocaleString()} UZS
-                </span>
+              <div className="fixed bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-[#f4f4f5] via-[#f4f4f5]/90 to-transparent z-20">
+                <button
+                  onClick={() => selected.length > 0 && setStep('confirm')}
+                  disabled={selected.length === 0}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-500 to-violet-500 text-white font-bold text-sm uppercase tracking-widest disabled:opacity-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(99,102,241,0.3)]"
+                >
+                  Tasdiqlash ({selected.length}) <ChevronRight size={18} />
+                </button>
               </div>
             </div>
+          )}
 
-            <div className="flex gap-3">
+          {/* STEP 3: Confirm */}
+          {step === 'confirm' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div>
+                <h2 className="text-2xl font-bold text-zinc-900 mb-1 tracking-tight">Tasdiqlang</h2>
+                <p className="text-zinc-500 text-sm font-medium">Tadbir: <span className="text-brand-500 font-bold">{eventName}</span></p>
+              </div>
+
+              <div className="space-y-3">
+                {selected.map(s => (
+                  <div key={s.item.id} className="bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl p-5 flex justify-between items-center">
+                    <div>
+                      <div className="font-bold text-zinc-800 text-base tracking-tight">{s.item.name}</div>
+                      <div className="text-rose-500 font-bold text-sm mt-1">-{s.qty} {s.item.unit.toLowerCase()}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-zinc-900 text-base tracking-tight" suppressHydrationWarning>
+                        {(s.item.price * s.qty).toLocaleString()} UZS
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-brand-500/5 border border-brand-500/20 rounded-2xl p-6 shadow-inner relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-500/10 rounded-full blur-3xl"></div>
+                <div className="flex justify-between items-center relative z-10">
+                  <span className="text-zinc-600 text-sm font-bold tracking-wide uppercase">Jami rasxod</span>
+                  <span className="text-brand-600 font-black text-2xl tracking-tight" suppressHydrationWarning>
+                    {totalCost.toLocaleString()} <span className="text-lg">UZS</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button
+                  onClick={() => setStep('items')}
+                  className="flex-1 py-4 rounded-2xl bg-white border border-zinc-200 text-zinc-600 font-bold text-sm active:scale-[0.98] transition-all shadow-sm"
+                >
+                  Orqaga
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="flex-[2] py-4 rounded-2xl bg-gradient-to-r from-brand-500 to-violet-500 text-white font-bold text-sm uppercase tracking-widest disabled:opacity-70 active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(99,102,241,0.3)] flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <span className="animate-pulse">Saqlanmoqda...</span>
+                  ) : (
+                    <>✓ Tasdiqlash</>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* DONE */}
+          {step === 'done' && (
+            <div className="flex flex-col items-center justify-center py-24 space-y-5 animate-in fade-in zoom-in duration-300">
+              <div className="relative">
+                <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full"></div>
+                <div className="w-24 h-24 rounded-full bg-emerald-100 border-4 border-white shadow-xl flex items-center justify-center relative z-10">
+                  <Check size={48} className="text-emerald-500" strokeWidth={3} />
+                </div>
+              </div>
+              <h2 className="text-3xl font-black text-zinc-900 tracking-tight">Muvaffaqiyatli!</h2>
+              <p className="text-zinc-500 font-medium text-base text-center leading-relaxed max-w-[250px]">
+                Chiqim saqlandi.<br />Oyna avtomatik yopiladi...
+              </p>
+            </div>
+          )}
+
+          {/* ERROR */}
+          {step === 'error' && (
+            <div className="flex flex-col items-center justify-center py-24 space-y-5 animate-in fade-in zoom-in duration-300">
+               <div className="relative">
+                <div className="absolute inset-0 bg-rose-500/20 blur-xl rounded-full"></div>
+                <div className="w-24 h-24 rounded-full bg-rose-100 border-4 border-white shadow-xl flex items-center justify-center relative z-10">
+                  <AlertCircle size={48} className="text-rose-500" />
+                </div>
+              </div>
+              <h2 className="text-3xl font-black text-zinc-900 tracking-tight">Xatolik!</h2>
+              <p className="text-zinc-500 font-medium text-base text-center leading-relaxed max-w-[250px]">{errorMsg}</p>
               <button
-                onClick={() => setStep('items')}
-                className="flex-1 py-4 rounded-2xl bg-white/40 border border-white/60 text-zinc-900/60 font-bold text-sm active:bg-white/10"
+                onClick={() => setStep('confirm')}
+                className="mt-4 px-8 py-4 rounded-2xl bg-white border border-zinc-200 text-zinc-700 font-bold text-sm shadow-sm active:scale-95 transition-all"
               >
-                Orqaga
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="flex-2 flex-grow-[2] py-4 rounded-2xl bg-indigo-500 text-zinc-900 font-black text-sm uppercase tracking-widest disabled:opacity-50 active:bg-indigo-600 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <span className="animate-pulse">Saqlanmoqda...</span>
-                ) : (
-                  <>✓ Tasdiqlash</>
-                )}
+                Qayta urinish
               </button>
             </div>
-          </div>
-        )}
-
-        {/* DONE */}
-        {step === 'done' && (
-          <div className="flex flex-col items-center justify-center py-20 space-y-4 animate-in fade-in zoom-in duration-300">
-            <div className="w-20 h-20 rounded-full bg-emerald-500/20 flex items-center justify-center mb-2">
-              <Check size={40} className="text-emerald-400" strokeWidth={3} />
-            </div>
-            <h2 className="text-2xl font-black text-zinc-900">Saqlandi!</h2>
-            <p className="text-zinc-900/40 text-sm text-center">
-              Chiqim muvaffaqiyatli qayd etildi.<br />Oyna yopilmoqda...
-            </p>
-          </div>
-        )}
-
-        {/* ERROR */}
-        {step === 'error' && (
-          <div className="flex flex-col items-center justify-center py-20 space-y-4">
-            <div className="w-20 h-20 rounded-full bg-rose-500/20 flex items-center justify-center mb-2">
-              <AlertCircle size={40} className="text-rose-400" />
-            </div>
-            <h2 className="text-2xl font-black text-zinc-900">Xatolik!</h2>
-            <p className="text-zinc-900/40 text-sm text-center">{errorMsg}</p>
-            <button
-              onClick={() => setStep('confirm')}
-              className="px-8 py-3 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 font-bold text-sm"
-            >
-              Qayta urinish
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
