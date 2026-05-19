@@ -6,7 +6,7 @@ const prisma = new PrismaClient()
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { actionType, eventName, telegramId, telegramName, items } = body
+    const { actionType, eventName, telegramId, telegramName, items, date } = body
 
     if (!eventName || !items || items.length === 0 || !actionType) {
       return NextResponse.json({ error: "Ma'lumotlar to'liq emas" }, { status: 400 })
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create all transactions
-    const now = new Date()
+    const txDate = date ? new Date(date) : new Date()
     for (const entry of items) {
       const item = await prisma.item.findUnique({ where: { id: entry.itemId } })
       if (!item) continue
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
           status: 'APPROVED',
           eventName: eventName,
           totalPrice: entry.totalPrice,
-          createdAt: now
+          createdAt: txDate
         }
       })
     }

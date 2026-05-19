@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search } from 'lucide-react'
+import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar } from 'lucide-react'
 
 type Item = {
   id: string
@@ -101,6 +101,13 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
   const [errorMsg, setErrorMsg] = useState('')
   const [tgUser, setTgUser] = useState<{ id: string; name: string } | null>(null)
   const [manualName, setManualName] = useState('')
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   useEffect(() => {
     setMounted(true)
@@ -178,6 +185,7 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
           eventName: eventName.trim(),
           telegramId: userId,
           telegramName: displayName,
+          date: selectedDate,
           items: selected.map(s => ({
             itemId: s.item.id,
             quantity: s.qty,
@@ -299,6 +307,18 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
                   value={!['Impulse', 'Assodiq', 'Nodir aka', 'Hamza'].includes(eventName) ? eventName : ''}
                   onChange={e => setEventName(e.target.value)}
                   className="w-full bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl py-4 px-5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-zinc-500 text-xs font-bold uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                  <Calendar size={14} className="text-zinc-400" /> Sana tanlang
+                </label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="w-full bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl py-4 px-5 text-zinc-900 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-bold text-base"
                 />
               </div>
 

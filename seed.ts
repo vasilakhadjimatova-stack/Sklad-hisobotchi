@@ -8,7 +8,6 @@ async function main() {
   const text = await response.text();
   
   const lines = text.split('\n');
-  const items = [];
   const events = []; // Array of { index, name, date }
   
   // Tadbirlar va Sanalarni o'qish (Qatorlar: 1=Tadbir, 2=Sana - 0-indexed)
@@ -47,9 +46,11 @@ async function main() {
     }
   });
 
-  // Tozalash: Faqat test emas, balki to'g'ri bo'lishi uchun oldin barcha ma'lumotlarni tozalash (Ixtiyoriy, lekin yaxshi)
+  // Tozalash: oldin barcha ma'lumotlarni tozalash
   await prisma.transaction.deleteMany({});
   await prisma.item.deleteMany({});
+
+  const tempItemsMap = new Map();
 
   for (let i = 6; i < lines.length; i++) {
     const line = lines[i];
@@ -71,60 +72,84 @@ async function main() {
         if (!isNaN(qty)) {
           name = name.replace(/^\d+\s*/, '').trim(); 
           if(name !== "") {
-            
-            // Mahsulotni saqlash
-            const savedItem = await prisma.item.create({
-              data: {
-                name,
-                quantity: qty,
-                price: price,
-                unit: unitStr || 'Dona'
-              }
+            tempItemsMap.set(name, {
+              name,
+              quantity: qty,
+              price: price,
+              unit: unitStr || 'Dona',
+              rawParts: parts
             });
-
-            // Shu mahsulotga tegishli eski operatsiyalarni tekshirish
-            let transactionCount = 0;
-            for (const event of events) {
-              const valStr = parts[event.colIndex] ? parts[event.colIndex].replace(/^"|"$/g, '').trim() : '';
-              if (valStr) {
-                const takenQty = parseFloat(valStr.replace(/\s/g, '').replace(',', '.'));
-                if (!isNaN(takenQty) && takenQty > 0) {
-                  // Yaratamiz Transaction
-                  
-                  // Sana formati DD.MM.YYYY yoki DD,MM,YYYY bo'lishi mumkin
-                  let createdAt = new Date();
-                  if (event.dateStr) {
-                    const dParts = event.dateStr.replace(/,/g, '.').split('.');
-                    if (dParts.length === 3) {
-                       createdAt = new Date(`${dParts[2]}-${dParts[1]}-${dParts[0]}T12:00:00Z`);
-                    }
-                  }
-
-                  await prisma.transaction.create({
-                    data: {
-                      userId: systemUser.id,
-                      itemId: savedItem.id,
-                      quantity: -takenQty, // qancha olingani
-                      type: 'TAKE',
-                      status: 'APPROVED',
-                      eventName: event.name,
-                      totalPrice: takenQty * price,
-                      createdAt: isNaN(createdAt.getTime()) ? new Date() : createdAt
-                    }
-                  });
-                  transactionCount++;
-                }
-              }
-            }
-            
-            items.push({ name, transactions: transactionCount });
           }
         }
       }
     }
   }
 
-  console.log(`✅ Muvaffaqiyatli: ${items.length} ta mahsulot va ularning tarixiy operatsiyalari saqlandi!`);
+  const itemsArray = Array.from(tempItemsMap.values());
+  console.log(`Foydali mahsulotlar soni: ${itemsArray.length} ta. Baza yuklanmoqda...`);
+
+  // Bulk insert all items
+  await prisma.item.createMany({
+    data: itemsArray.map(item => ({
+      name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+      unit: item.unit
+    }))
+  });
+
+  // Fetch items back to get their IDs
+  const dbItems = await prisma.item.findMany();
+  const dbItemMap = new Map(dbItems.map(item => [item.name, item]));
+
+  const transactionsToCreate: any[] = [];
+
+  // Build transactions list
+  for (const item of itemsArray) {
+    const dbItem = dbItemMap.get(item.name);
+    if (!dbItem) continue;
+
+    for (const event of events) {
+      const valStr = item.rawParts[event.colIndex] ? item.rawParts[event.colIndex].replace(/^"|"$/g, '').trim() : '';
+      if (valStr) {
+        const takenQty = parseFloat(valStr.replace(/\s/g, '').replace(',', '.'));
+        if (!isNaN(takenQty) && takenQty > 0) {
+          // Sana formati DD.MM.YYYY yoki DD,MM,YYYY bo'lishi mumkin
+          let createdAt = new Date();
+          if (event.dateStr) {
+            const dParts = event.dateStr.replace(/,/g, '.').split('.');
+            if (dParts.length === 3) {
+               createdAt = new Date(`${dParts[2]}-${dParts[1]}-${dParts[0]}T12:00:00Z`);
+            }
+          }
+
+          transactionsToCreate.push({
+            userId: systemUser.id,
+            itemId: dbItem.id,
+            quantity: -takenQty, // qancha olingani
+            type: 'TAKE',
+            status: 'APPROVED',
+            eventName: event.name,
+            totalPrice: takenQty * item.price,
+            createdAt: isNaN(createdAt.getTime()) ? new Date() : createdAt
+          });
+        }
+      }
+    }
+  }
+
+  console.log(`Tranzaksiyalar soni: ${transactionsToCreate.length} ta. Tranzaksiyalar yozilmoqda...`);
+
+  // Bulk insert all transactions in chunks of 500 to prevent database packet limits
+  const chunkSize = 500;
+  for (let i = 0; i < transactionsToCreate.length; i += chunkSize) {
+    const chunk = transactionsToCreate.slice(i, i + chunkSize);
+    await prisma.transaction.createMany({
+      data: chunk
+    });
+  }
+
+  console.log(`✅ Muvaffaqiyatli: ${itemsArray.length} ta mahsulot va ularning ${transactionsToCreate.length} ta tarixiy operatsiyalari saqlandi!`);
 }
 
 main()
