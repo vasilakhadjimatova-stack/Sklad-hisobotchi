@@ -3,6 +3,46 @@ import AnalyticsDashboard from '@/components/AnalyticsDashboard'
 
 export const revalidate = 0
 
+// --- Bir kundagi o'xshash nomli tadbirlarni bitta qilib birlashtirish ---
+function normalizeEventName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/['’`]/g, '')
+    .replace(/[^a-z0-9Ѐ-ӿ]+/gi, ' ') // harf/raqam bo'lmaganini probelga
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+// raqamlarni olib tashlab "asos"ni olish ("toy 1" -> "toy")
+function baseWithoutDigits(norm: string): string {
+  return norm.replace(/[0-9]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length
+  if (!m) return n
+  if (!n) return m
+  const dp = Array.from({ length: m + 1 }, (_, i) => i)
+  for (let j = 1; j <= n; j++) {
+    let prev = dp[0]
+    dp[0] = j
+    for (let i = 1; i <= m; i++) {
+      const tmp = dp[i]
+      dp[i] = Math.min(dp[i] + 1, dp[i - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
+      prev = tmp
+    }
+  }
+  return dp[m]
+}
+// Ikki nom "bir xil tadbir"mi? Typo'ga bardosh, lekin faqat raqam
+// farqi bo'lsa ALOHIDA qoladi ("Toy 1" ≠ "Toy 2").
+function sameEvent(aNorm: string, bNorm: string): boolean {
+  if (aNorm === bNorm) return true
+  if (baseWithoutDigits(aNorm) === baseWithoutDigits(bNorm)) return false
+  const maxLen = Math.max(aNorm.length, bNorm.length)
+  if (maxLen < 4) return false
+  const dist = levenshtein(aNorm, bNorm)
+  return dist <= 2 && dist <= Math.floor(maxLen * 0.25)
+}
+
 export default async function AnalyticsPage() {
   const items = await prisma.item.findMany()
   const transactions = await prisma.transaction.findMany({
@@ -10,6 +50,35 @@ export default async function AnalyticsPage() {
     include: { item: true },
     orderBy: { createdAt: 'desc' }
   })
+
+  // Har sana uchun: xom nom -> kanonik (birlashtirilgan) nom.
+  // Vakil sifatida eng ko'p uchragan / uzunroq variant tanlanadi.
+  const namesByDate: Record<string, Map<string, number>> = {}
+  for (const t of transactions) {
+    const dateStr = t.createdAt.toLocaleDateString('uz-UZ')
+    const nm = t.eventName || 'Noma\'lum Tadbir'
+    if (!namesByDate[dateStr]) namesByDate[dateStr] = new Map()
+    namesByDate[dateStr].set(nm, (namesByDate[dateStr].get(nm) || 0) + 1)
+  }
+  const canonicalByDate: Record<string, Record<string, string>> = {}
+  for (const dateStr of Object.keys(namesByDate)) {
+    const names = Array.from(namesByDate[dateStr].entries())
+      .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+      .map(e => e[0])
+    const clusters: { rep: string, repNorm: string }[] = []
+    const map: Record<string, string> = {}
+    for (const nm of names) {
+      const norm = normalizeEventName(nm)
+      const hit = clusters.find(c => sameEvent(norm, c.repNorm))
+      if (hit) {
+        map[nm] = hit.rep
+      } else {
+        clusters.push({ rep: nm, repNorm: norm })
+        map[nm] = nm
+      }
+    }
+    canonicalByDate[dateStr] = map
+  }
 
   const totalInventoryValue = items.reduce((acc, item) => acc + (item.quantity * item.price), 0)
 
@@ -37,8 +106,9 @@ export default async function AnalyticsPage() {
 
   transactions.forEach(t => {
     const monthKey = t.createdAt.toLocaleString('uz-UZ', { month: 'long', year: 'numeric' })
-    const eventName = t.eventName || 'Noma\'lum Tadbir'
     const dateStr = t.createdAt.toLocaleDateString('uz-UZ')
+    const rawName = t.eventName || 'Noma\'lum Tadbir'
+    const eventName = canonicalByDate[dateStr]?.[rawName] || rawName
     const eventKey = `${dateStr}_${eventName}`
     const itemCost = t.totalPrice || (Math.abs(t.quantity) * t.item.price)
 
