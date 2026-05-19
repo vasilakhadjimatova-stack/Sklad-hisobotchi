@@ -174,12 +174,14 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   // Custom select state managed at parent to prevent reset bugs
   const [selectedItem, setSelectedItem] = useState<AdminItem | null>(null)
 
-  // Birlik sozlash maydonlari (UNIT/NEW tab uchun nazoratli holat)
+  // Tahrirlash/Yangi maydonlari (UNIT/NEW tab uchun nazoratli holat)
+  const [nameField, setNameField] = useState('')
   const [unitField, setUnitField] = useState('dona')
   const [packUnitField, setPackUnitField] = useState('pachka')
   const [packSizeField, setPackSizeField] = useState('1')
 
   const resetUnitFields = () => {
+    setNameField('')
     setUnitField('dona')
     setPackUnitField('pachka')
     setPackSizeField('1')
@@ -193,10 +195,11 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     if (formRef.current) formRef.current.reset()
   }
 
-  // UNIT tabda mahsulot tanlanса — uning hozirgi birlik sozlamasini ko'rsatish
+  // Tahrirlash tabida mahsulot tanlanса — hozirgi nom va birlik sozlamasini ko'rsatish
   const handleSelectForUnit = (item: AdminItem | null) => {
     setSelectedItem(item)
     if (item) {
+      setNameField(item.name || '')
       setUnitField(item.unit || 'dona')
       setPackUnitField(item.packUnit || 'pachka')
       setPackSizeField(String(item.packSize ?? 1))
@@ -327,7 +330,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
           }`}
         >
           <Settings2 size={16} />
-          Birlik sozlash <span className="hidden sm:inline">(pachka/dona)</span>
+          Tahrirlash <span className="hidden sm:inline">(nom, birlik/pachka)</span>
         </button>
       </div>
 
@@ -410,9 +413,28 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                 selectedItem={selectedItem}
               />
             </div>
+            {selectedItem && (
+              <div className="w-full">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Mahsulot nomi</label>
+                <input
+                  name="name"
+                  type="text"
+                  required
+                  value={nameField}
+                  onChange={(e) => setNameField(e.target.value)}
+                  placeholder="Mahsulot nomi"
+                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
+                />
+              </div>
+            )}
             {selectedItem && unitConfigBlock}
+            {selectedItem && (
+              <p className="text-xs text-zinc-900/40 font-medium -mt-1">
+                Nomni o'zgartirsangiz tarix buzilmaydi (operatsiyalar mahsulotga ID orqali bog'langan). Zaxira (qoldiq) ham o'zgarmaydi.
+              </p>
+            )}
             {!selectedItem && (
-              <p className="text-sm text-zinc-900/40 font-medium">Pachka/dona sozlash uchun avval mahsulotni tanlang. Zaxira (qoldiq) o'zgarmaydi.</p>
+              <p className="text-sm text-zinc-900/40 font-medium">Nomini yoki pachka/dona sozlamasini o'zgartirish uchun avval mahsulotni tanlang. Zaxira (qoldiq) o'zgarmaydi.</p>
             )}
           </>
         )}

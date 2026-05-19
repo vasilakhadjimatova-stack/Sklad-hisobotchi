@@ -88,23 +88,34 @@ export async function addStock(formData: FormData) {
   }
 }
 
-// Mavjud mahsulotning birlik/pachka sozlamasini belgilash (konvertatsiya uchun).
+// Mavjud mahsulotni tahrirlash: nom + birlik/pachka sozlamasi.
 // Zaxira (quantity) o'zgarmaydi — u doim bazaviy birlikda (dona) qoladi.
+// Nom o'zgarsa tarix buzilmaydi (tranzaksiyalar itemId orqali bog'langan).
 export async function setItemUnit(formData: FormData) {
   const itemId = formData.get('itemId')?.toString()
+  const name = formData.get('name')?.toString()?.trim()
   const unit = formData.get('unit')?.toString()?.trim() || 'Dona'
   const packUnit = formData.get('packUnit')?.toString()?.trim() || 'pachka'
   const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
 
   if (!itemId) return { error: "Mahsulot tanlanmadi" }
+  if (!name) return { error: "Nom bo'sh bo'lishi mumkin emas" }
 
   try {
     const item = await prisma.item.findUnique({ where: { id: itemId } })
     if (!item) return { error: "Mahsulot topilmadi" }
 
+    // Nom o'zgarsa — boshqa mahsulotda shu nom yo'qligini tekshirish (nom unique)
+    if (name !== item.name) {
+      const clash = await prisma.item.findUnique({ where: { name } })
+      if (clash && clash.id !== itemId) {
+        return { error: "Bunday nomli mahsulot allaqachon bor" }
+      }
+    }
+
     await prisma.item.update({
       where: { id: itemId },
-      data: { unit, packUnit, packSize }
+      data: { name, unit, packUnit, packSize }
     })
 
     revalidatePath('/')
