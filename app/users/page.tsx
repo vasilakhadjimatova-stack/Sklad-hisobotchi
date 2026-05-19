@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma';
 import { Shield, ShieldAlert, User as UserIcon, Activity, Clock, MoreVertical, Search, Package, Users } from 'lucide-react'
-
-const prisma = new PrismaClient()
 
 export const dynamic = 'force-dynamic'
 

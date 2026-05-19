@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma';
 import AnalyticsDashboard from '@/components/AnalyticsDashboard'
-
-const prisma = new PrismaClient()
 
 export const revalidate = 0
 

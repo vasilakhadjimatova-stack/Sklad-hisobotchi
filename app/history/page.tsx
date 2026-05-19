@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import prisma from '@/lib/prisma';
 import { History, User as UserIcon, Package, ArrowUpRight, ArrowDownLeft, Settings2 } from 'lucide-react'
-
-const prisma = new PrismaClient()
 
 export const revalidate = 0
 

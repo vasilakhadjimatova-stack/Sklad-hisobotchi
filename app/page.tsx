@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '@/lib/prisma';
 import { Package, TrendingDown, TrendingUp, Clock, LayoutDashboard, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import AdminPanel from '@/components/AdminPanel';
 
-const prisma = new PrismaClient();
 
 export const dynamic = 'force-dynamic'
 
