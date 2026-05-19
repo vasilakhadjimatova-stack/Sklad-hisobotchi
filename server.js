@@ -1,3 +1,7 @@
+// Butun jarayon (Next.js server-komponentlari + bot) Toshkent vaqtida
+// ishlasin — aks holda Railway UTC'da bo'lib vaqtlar 5 soat orqada chiqadi.
+process.env.TZ = process.env.TZ || 'Asia/Tashkent';
+
 const { spawn } = require('child_process');
 
 console.log('Starting Next.js and Telegram Bot...');
