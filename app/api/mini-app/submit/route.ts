@@ -43,13 +43,22 @@ export async function POST(req: NextRequest) {
       const item = await prisma.item.findUnique({ where: { id: entry.itemId } })
       if (!item) continue
 
+      // Birlik konvertatsiyasi: zaxira HAR DOIM bazaviy birlikda (dona).
+      // Foydalanuvchi pachka tanlasa, packSize ga ko'paytiramiz.
+      const packSize = Math.max(1, item.packSize || 1)
+      const unitMode = entry.unitMode === 'pack' ? 'pack' : 'piece'
+      const baseQty = unitMode === 'pack'
+        ? Math.round((entry.quantity || 0) * packSize)
+        : Math.round(entry.quantity || 0)
+      if (baseQty <= 0) continue
+
       const isTake = actionType === 'TAKE'
-      const newQty = isTake ? item.quantity - entry.quantity : item.quantity + entry.quantity
+      const newQty = isTake ? item.quantity - baseQty : item.quantity + baseQty
       if (isTake && newQty < 0) continue // Skip if not enough stock for TAKE
 
       const updateData: any = { quantity: newQty }
-      if (!isTake && entry.totalPrice > 0 && entry.quantity > 0) {
-        updateData.price = Math.round(entry.totalPrice / entry.quantity)
+      if (!isTake && entry.totalPrice > 0 && baseQty > 0) {
+        updateData.price = Math.round(entry.totalPrice / baseQty)
       }
 
       await prisma.item.update({
@@ -61,11 +70,12 @@ export async function POST(req: NextRequest) {
         data: {
           userId: user.id,
           itemId: entry.itemId,
-          quantity: isTake ? -entry.quantity : entry.quantity,
+          quantity: isTake ? -baseQty : baseQty,
           type: actionType,
           status: 'APPROVED',
           eventName: eventName,
           totalPrice: entry.totalPrice,
+          unitMode: unitMode,
           createdAt: txDate
         }
       })

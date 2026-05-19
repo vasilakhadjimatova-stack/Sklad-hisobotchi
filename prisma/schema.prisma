@@ -19,9 +19,11 @@ model User {
 model Item {
   id           String        @id @default(cuid())
   name         String        @unique
-  quantity     Int           @default(0)
-  price        Float         @default(0)
-  unit         String        @default("Dona")
+  quantity     Int           @default(0)   // zaxira HAR DOIM bazaviy birlikda (dona)
+  price        Float         @default(0)   // narx HAR DOIM 1 dona uchun
+  unit         String        @default("Dona") // bazaviy (dona) birlik nomi
+  packSize     Int           @default(1)   // 1 pachkada nechta dona (1 = pachka yo'q)
+  packUnit     String        @default("pachka") // pachka birligi nomi
   transactions Transaction[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -39,5 +41,6 @@ model Transaction {
   image      String?  // Rasm file_id
   eventName  String?  // Qaysi tadbir uchun olingani
   totalPrice Float?   // quantity * item.price
+  unitMode   String?  // "pack" | "piece" — chiqim qaysi birlikda kiritilgani
   createdAt  DateTime @default(now())
 }

@@ -1,8 +1,10 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { createNewItem, addStock } from '@/app/actions'
-import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check } from 'lucide-react'
+import { createNewItem, addStock, setItemUnit } from '@/app/actions'
+import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2 } from 'lucide-react'
+
+type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number }
 
 // O'yin uslubidagi chiroyli ranglar
 const gradientColors = [
@@ -25,11 +27,11 @@ const getGradient = (name: string) => {
 }
 
 // Custom Catalog Modal component
-function CatalogModal({ items, name, onSelect, selectedItem }: { 
-  items: { id: string, name: string }[], 
+function CatalogModal({ items, name, onSelect, selectedItem }: {
+  items: AdminItem[],
   name: string,
-  onSelect: (item: {id: string, name: string} | null) => void,
-  selectedItem: {id: string, name: string} | null
+  onSelect: (item: AdminItem | null) => void,
+  selectedItem: AdminItem | null
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -48,8 +50,8 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
   return (
     <div className="relative w-full">
       <input type="hidden" name={name} value={selectedItem?.id || ''} required />
-      
-      <div 
+
+      <div
         onClick={() => setIsOpen(true)}
         className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 cursor-pointer flex justify-between items-center hover:bg-white/80 transition-all shadow-inner group"
       >
@@ -73,7 +75,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-xl bg-white/80">
           <div className="w-full max-w-5xl bg-dark-800 border border-white/60 rounded-2xl shadow-2xl flex flex-col h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200">
-            
+
             {/* Modal Header */}
             <div className="p-6 border-b border-white/60 flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 flex-1">
@@ -85,7 +87,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
                   <p className="text-zinc-900/50 text-sm">Jami {items.length} ta mahsulot bazada mavjud</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsOpen(false)}
                 className="w-10 h-10 rounded-full bg-white/40 flex items-center justify-center hover:bg-white/10 hover:text-rose-400 transition-colors text-zinc-900/50"
               >
@@ -97,7 +99,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
             <div className="px-6 py-4 border-b border-white/60 bg-white/30">
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-900/40" size={20} />
-                <input 
+                <input
                   type="text"
                   autoFocus
                   value={search}
@@ -107,7 +109,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
                 />
               </div>
             </div>
-            
+
             {/* Grid Catalog */}
             <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
               {filteredItems.length === 0 ? (
@@ -118,7 +120,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   {filteredItems.map(item => (
-                    <div 
+                    <div
                       key={item.id}
                       onClick={() => {
                         onSelect(item)
@@ -126,8 +128,8 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
                         setSearch('')
                       }}
                       className={`relative flex flex-col group cursor-pointer rounded-2xl border p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
-                        selectedItem?.id === item.id 
-                          ? 'bg-brand-500/10 border-brand-500/50 shadow-black/10' 
+                        selectedItem?.id === item.id
+                          ? 'bg-brand-500/10 border-brand-500/50 shadow-black/10'
                           : 'bg-white/40 border-white/60 hover:border-white/20 hover:bg-white/60'
                       }`}
                     >
@@ -136,7 +138,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
                         <span className="text-5xl font-black text-zinc-900/30 group-hover:text-zinc-900/50 transition-colors">
                           {item.name.charAt(0).toUpperCase()}
                         </span>
-                        
+
                         {/* Overlay if selected */}
                         {selectedItem?.id === item.id && (
                           <div className="absolute inset-0 bg-brand-500/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in">
@@ -146,7 +148,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="flex-1 flex flex-col">
                         <h3 className="text-sm font-semibold text-zinc-900/90 line-clamp-2 leading-snug group-hover:text-zinc-900 transition-colors">{item.name}</h3>
                       </div>
@@ -162,25 +164,49 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
   )
 }
 
-export default function AdminPanel({ items }: { items: { id: string, name: string }[] }) {
-  const [activeTab, setActiveTab] = useState<'NEW' | 'ADD'>('ADD')
+export default function AdminPanel({ items }: { items: AdminItem[] }) {
+  const [activeTab, setActiveTab] = useState<'NEW' | 'ADD' | 'UNIT'>('ADD')
   const formRef = useRef<HTMLFormElement>(null)
   const [msg, setMsg] = useState('')
   const [isError, setIsError] = useState(false)
   const [loading, setLoading] = useState(false)
-  
-  // Custom select state managed at parent to prevent reset bugs
-  const [selectedItem, setSelectedItem] = useState<{id: string, name: string} | null>(null)
 
-  const handleTabChange = (tab: 'NEW' | 'ADD') => {
+  // Custom select state managed at parent to prevent reset bugs
+  const [selectedItem, setSelectedItem] = useState<AdminItem | null>(null)
+
+  // Birlik sozlash maydonlari (UNIT/NEW tab uchun nazoratli holat)
+  const [unitField, setUnitField] = useState('dona')
+  const [packUnitField, setPackUnitField] = useState('pachka')
+  const [packSizeField, setPackSizeField] = useState('1')
+
+  const resetUnitFields = () => {
+    setUnitField('dona')
+    setPackUnitField('pachka')
+    setPackSizeField('1')
+  }
+
+  const handleTabChange = (tab: 'NEW' | 'ADD' | 'UNIT') => {
     setActiveTab(tab)
     setMsg('')
     setSelectedItem(null)
+    resetUnitFields()
     if (formRef.current) formRef.current.reset()
   }
 
+  // UNIT tabda mahsulot tanlanса — uning hozirgi birlik sozlamasini ko'rsatish
+  const handleSelectForUnit = (item: AdminItem | null) => {
+    setSelectedItem(item)
+    if (item) {
+      setUnitField(item.unit || 'dona')
+      setPackUnitField(item.packUnit || 'pachka')
+      setPackSizeField(String(item.packSize ?? 1))
+    } else {
+      resetUnitFields()
+    }
+  }
+
   async function handleAction(formData: FormData) {
-    if (activeTab === 'ADD' && !selectedItem) {
+    if ((activeTab === 'ADD' || activeTab === 'UNIT') && !selectedItem) {
       setMsg('Iltimos, katalogdan mahsulotni tanlang')
       setIsError(true)
       return
@@ -189,15 +215,17 @@ export default function AdminPanel({ items }: { items: { id: string, name: strin
     setLoading(true)
     setMsg('Jarayonda...')
     setIsError(false)
-    
+
     // Make sure formData has the correct itemId
-    if (activeTab === 'ADD' && selectedItem) {
+    if ((activeTab === 'ADD' || activeTab === 'UNIT') && selectedItem) {
       formData.set('itemId', selectedItem.id)
     }
 
-    const result = activeTab === 'NEW' 
-      ? await createNewItem(formData) 
-      : await addStock(formData)
+    const result = activeTab === 'NEW'
+      ? await createNewItem(formData)
+      : activeTab === 'UNIT'
+        ? await setItemUnit(formData)
+        : await addStock(formData)
 
     setLoading(false)
     if (result?.error) {
@@ -208,94 +236,194 @@ export default function AdminPanel({ items }: { items: { id: string, name: strin
       setIsError(false)
       formRef.current?.reset()
       setSelectedItem(null)
+      resetUnitFields()
       setTimeout(() => setMsg(''), 4000)
     }
   }
+
+  const packSizeNum = Math.max(1, Math.floor(Number(packSizeField) || 1))
+  const hasPack = packSizeNum > 1
+
+  // Birlik sozlash bloki (NEW va UNIT tab uchun umumiy)
+  const unitConfigBlock = (
+    <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Bazaviy birlik</label>
+        <input
+          name="unit"
+          type="text"
+          value={unitField}
+          onChange={(e) => setUnitField(e.target.value)}
+          placeholder="dona"
+          className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all shadow-inner"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">1 pachkada nechta dona</label>
+        <input
+          name="packSize"
+          type="number"
+          min="1"
+          value={packSizeField}
+          onChange={(e) => setPackSizeField(e.target.value)}
+          placeholder="1 = pachka yo'q"
+          className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Pachka birligi nomi</label>
+        <input
+          name="packUnit"
+          type="text"
+          value={packUnitField}
+          onChange={(e) => setPackUnitField(e.target.value)}
+          placeholder="pachka"
+          disabled={!hasPack}
+          className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner disabled:opacity-40"
+        />
+      </div>
+      <div className="sm:col-span-3 text-xs text-zinc-900/40 font-medium -mt-1">
+        {hasPack
+          ? `1 ${packUnitField || 'pachka'} = ${packSizeNum} ${unitField || 'dona'}. Mini-appda chiqimda ikkalasini tanlash mumkin bo'ladi.`
+          : `Pachka yo'q — faqat ${unitField || 'dona'}. Pachka qo'shish uchun "1 pachkada nechta dona" ni 1 dan katta qiling.`}
+      </div>
+    </div>
+  )
 
   return (
     <div className="glass-card p-6 md:p-8 rounded-2xl mb-10 relative overflow-visible group border border-white/60 shadow-2xl z-20">
       {/* Background glow */}
       <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand-500/20 rounded-full blur-[80px] pointer-events-none"></div>
-      
-      <div className="flex gap-2 sm:gap-4 mb-8 border-b border-white/60 pb-4 relative z-10">
-        <button 
+
+      <div className="flex flex-wrap gap-2 sm:gap-4 mb-8 border-b border-white/60 pb-4 relative z-10">
+        <button
           onClick={() => handleTabChange('ADD')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-            activeTab === 'ADD' 
-              ? 'bg-brand-500 text-zinc-900 shadow-[0_0_15px_rgba(99,102,241,0.4)]' 
+            activeTab === 'ADD'
+              ? 'bg-brand-500 text-zinc-900 shadow-[0_0_15px_rgba(99,102,241,0.4)]'
               : 'text-zinc-900/50 hover:text-zinc-900 hover:bg-white/40'
           }`}
         >
           <ArrowDownCircle size={16} />
           Kirim qilish <span className="hidden sm:inline">(Mavjud mahsulot)</span>
         </button>
-        <button 
+        <button
           onClick={() => handleTabChange('NEW')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-            activeTab === 'NEW' 
-              ? 'bg-violet-500 text-zinc-900 shadow-[0_0_15px_rgba(139,92,246,0.4)]' 
+            activeTab === 'NEW'
+              ? 'bg-violet-500 text-zinc-900 shadow-[0_0_15px_rgba(139,92,246,0.4)]'
               : 'text-zinc-900/50 hover:text-zinc-900 hover:bg-white/40'
           }`}
         >
           <PlusCircle size={16} />
           Yangi mahsulot <span className="hidden sm:inline">qo'shish</span>
         </button>
+        <button
+          onClick={() => handleTabChange('UNIT')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            activeTab === 'UNIT'
+              ? 'bg-amber-500 text-zinc-900 shadow-[0_0_15px_rgba(245,158,11,0.4)]'
+              : 'text-zinc-900/50 hover:text-zinc-900 hover:bg-white/40'
+          }`}
+        >
+          <Settings2 size={16} />
+          Birlik sozlash <span className="hidden sm:inline">(pachka/dona)</span>
+        </button>
       </div>
 
-      <form ref={formRef} action={handleAction} className="flex flex-col sm:flex-row gap-5 items-end relative z-10">
-        {activeTab === 'NEW' ? (
-          <div className="flex-1 w-full">
-            <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Mahsulot Nomi</label>
-            <input 
-              name="name" 
-              type="text" 
-              required 
-              placeholder="Masalan: Kuler qog'oz stakani" 
-              className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all shadow-inner" 
-            />
-          </div>
-        ) : (
-          <div className="flex-1 w-full">
-            <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Katalogdan tanlang</label>
-            <CatalogModal 
-              items={items} 
-              name="itemId" 
-              onSelect={setSelectedItem} 
-              selectedItem={selectedItem} 
-            />
+      <form ref={formRef} action={handleAction} className="flex flex-col gap-5 relative z-10">
+        {activeTab === 'NEW' && (
+          <>
+            <div className="flex flex-col sm:flex-row gap-5 items-end">
+              <div className="flex-1 w-full">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Mahsulot Nomi</label>
+                <input
+                  name="name"
+                  type="text"
+                  required
+                  placeholder="Masalan: Kuler qog'oz stakani"
+                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all shadow-inner"
+                />
+              </div>
+              <div className="w-full sm:w-48">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Boshlang'ich miqdor ({unitField || 'dona'})</label>
+                <input
+                  name="quantity"
+                  type="number"
+                  required
+                  min="1"
+                  placeholder="0"
+                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
+                />
+              </div>
+            </div>
+            {unitConfigBlock}
+          </>
+        )}
+
+        {activeTab === 'ADD' && (
+          <div className="flex flex-col sm:flex-row gap-5 items-end">
+            <div className="flex-1 w-full">
+              <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Katalogdan tanlang</label>
+              <CatalogModal
+                items={items}
+                name="itemId"
+                onSelect={setSelectedItem}
+                selectedItem={selectedItem}
+              />
+            </div>
+            <div className="w-full sm:w-40">
+              <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Miqdori</label>
+              <input
+                name="quantity"
+                type="number"
+                required
+                min="1"
+                placeholder="0"
+                className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
+              />
+            </div>
           </div>
         )}
-        
-        <div className="w-full sm:w-40">
-          <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Miqdori</label>
-          <input 
-            name="quantity" 
-            type="number" 
-            required 
-            min="1" 
-            placeholder="0" 
-            className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner" 
-          />
-        </div>
 
-        <button 
-          type="submit" 
+        {activeTab === 'UNIT' && (
+          <>
+            <div className="w-full">
+              <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Mahsulotni tanlang</label>
+              <CatalogModal
+                items={items}
+                name="itemId"
+                onSelect={handleSelectForUnit}
+                selectedItem={selectedItem}
+              />
+            </div>
+            {selectedItem && unitConfigBlock}
+            {!selectedItem && (
+              <p className="text-sm text-zinc-900/40 font-medium">Pachka/dona sozlash uchun avval mahsulotni tanlang. Zaxira (qoldiq) o'zgarmaydi.</p>
+            )}
+          </>
+        )}
+
+        <button
+          type="submit"
           disabled={loading}
-          className={`w-full sm:w-auto px-8 py-3 rounded-xl font-bold transition-all shadow-lg text-zinc-900 ${
-            loading ? 'bg-white/10 cursor-not-allowed opacity-70' : 
-            activeTab === 'ADD' 
-              ? 'bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 hover:shadow-brand-500/25 border border-brand-400/20 hover:-translate-y-0.5' 
-              : 'bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 hover:shadow-violet-500/25 border border-violet-400/20 hover:-translate-y-0.5'
+          className={`w-full sm:w-auto sm:self-end px-8 py-3 rounded-xl font-bold transition-all shadow-lg text-zinc-900 ${
+            loading ? 'bg-white/10 cursor-not-allowed opacity-70' :
+            activeTab === 'ADD'
+              ? 'bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 hover:shadow-brand-500/25 border border-brand-400/20 hover:-translate-y-0.5'
+              : activeTab === 'UNIT'
+                ? 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 hover:shadow-amber-500/25 border border-amber-400/20 hover:-translate-y-0.5'
+                : 'bg-gradient-to-r from-violet-600 to-violet-500 hover:from-violet-500 hover:to-violet-400 hover:shadow-violet-500/25 border border-violet-400/20 hover:-translate-y-0.5'
           }`}
         >
           {loading ? 'Bajarilmoqda...' : 'Tasdiqlash'}
         </button>
       </form>
-      
+
       {msg && (
         <div className={`mt-6 p-4 rounded-xl flex items-center gap-3 text-sm font-medium border relative z-10 animate-in fade-in slide-in-from-bottom-2 ${
-          isError 
-            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
+          isError
+            ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
             : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
         }`}>
           {isError ? (

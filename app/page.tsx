@@ -1,6 +1,7 @@
 import prisma from '@/lib/prisma';
 import { Package, TrendingDown, TrendingUp, Clock, LayoutDashboard, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import AdminPanel from '@/components/AdminPanel';
+import { formatQty, packHint } from '@/lib/units';
 
 
 export const dynamic = 'force-dynamic'
@@ -132,7 +133,7 @@ export default async function Home() {
         </div>
       </div>
 
-      <AdminPanel items={items.map((i: any) => ({ id: i.id, name: i.name }))} />
+      <AdminPanel items={items.map((i: any) => ({ id: i.id, name: i.name, unit: i.unit, packUnit: i.packUnit, packSize: i.packSize }))} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-10">
         {/* Inventory Table */}
@@ -178,7 +179,7 @@ export default async function Home() {
                             ? 'bg-brand-500/10 text-brand-400 border-brand-500/20'
                             : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                         }`}>
-                          {item.quantity} ta
+                          {item.quantity} {(item.unit || 'dona').toLowerCase()}{packHint(item.quantity, item) ? ` · ${packHint(item.quantity, item)}` : ''}
                         </span>
                       </td>
                       <td className="p-5 text-zinc-900/40 text-sm text-right font-medium">
@@ -231,7 +232,7 @@ export default async function Home() {
                       </div>
                       <div className="text-xs text-zinc-900/30 flex gap-3 items-center mt-2 font-medium">
                         <span className={`px-2 py-0.5 rounded-md ${tx.type === 'TAKE' ? 'bg-rose-500/10 text-rose-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                          {tx.type === 'TAKE' ? '-' : '+'}{Math.abs(tx.quantity)}
+                          {tx.type === 'TAKE' ? '-' : '+'}{formatQty(tx.quantity, tx.item, tx.unitMode)}
                         </span>
                         •
                         <span>{tx.createdAt.toLocaleString('uz-UZ', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>

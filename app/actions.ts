@@ -17,6 +17,9 @@ async function getAdminUser() {
 export async function createNewItem(formData: FormData) {
   const name = formData.get('name')?.toString()
   const quantity = Number(formData.get('quantity'))
+  const unit = formData.get('unit')?.toString()?.trim() || 'Dona'
+  const packUnit = formData.get('packUnit')?.toString()?.trim() || 'pachka'
+  const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
 
   if (!name || isNaN(quantity) || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri (Soni 0 dan katta bo'lishi kerak)" }
 
@@ -27,7 +30,7 @@ export async function createNewItem(formData: FormData) {
     const admin = await getAdminUser()
 
     const item = await prisma.item.create({
-      data: { name, quantity }
+      data: { name, quantity, unit, packUnit, packSize }
     })
 
     await prisma.transaction.create({
@@ -77,6 +80,34 @@ export async function addStock(formData: FormData) {
     })
 
     revalidatePath('/')
+    return { success: true }
+  } catch (err) {
+    console.error(err)
+    return { error: "Xatolik yuz berdi" }
+  }
+}
+
+// Mavjud mahsulotning birlik/pachka sozlamasini belgilash (konvertatsiya uchun).
+// Zaxira (quantity) o'zgarmaydi — u doim bazaviy birlikda (dona) qoladi.
+export async function setItemUnit(formData: FormData) {
+  const itemId = formData.get('itemId')?.toString()
+  const unit = formData.get('unit')?.toString()?.trim() || 'Dona'
+  const packUnit = formData.get('packUnit')?.toString()?.trim() || 'pachka'
+  const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
+
+  if (!itemId) return { error: "Mahsulot tanlanmadi" }
+
+  try {
+    const item = await prisma.item.findUnique({ where: { id: itemId } })
+    if (!item) return { error: "Mahsulot topilmadi" }
+
+    await prisma.item.update({
+      where: { id: itemId },
+      data: { unit, packUnit, packSize }
+    })
+
+    revalidatePath('/')
+    revalidatePath('/history')
     return { success: true }
   } catch (err) {
     console.error(err)

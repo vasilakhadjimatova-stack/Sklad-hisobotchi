@@ -1,5 +1,6 @@
 import prisma from '@/lib/prisma';
 import { History, User as UserIcon, Package, ArrowUpRight, ArrowDownLeft, Settings2 } from 'lucide-react'
+import { formatQty } from '@/lib/units'
 
 export const revalidate = 0
 
@@ -81,7 +82,7 @@ export default async function HistoryPage() {
                     <td className="p-6">
                       <div className={`flex items-center gap-1 font-black ${isAdd ? 'text-emerald-400' : isTake ? 'text-rose-400' : 'text-amber-400'}`}>
                         {isAdd ? <ArrowDownLeft size={14} /> : isTake ? <ArrowUpRight size={14} /> : null}
-                        {isAdd ? '+' : ''}{t.quantity} {t.item.unit.toLowerCase()}
+                        {isTake ? '-' : isAdd ? '+' : ''}{formatQty(t.quantity, t.item, t.unitMode)}
                       </div>
                     </td>
                     <td className="p-6">

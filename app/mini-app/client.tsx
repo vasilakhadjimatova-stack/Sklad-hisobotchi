@@ -9,13 +9,31 @@ type Item = {
   quantity: number
   unit: string
   price: number
+  packSize: number
+  packUnit: string
 }
+
+type UnitMode = 'pack' | 'piece'
 
 type SelectedItem = {
   item: Item
   qty: number
+  mode: UnitMode
   newTotalPrice?: string
 }
+
+// Mahsulot pachkali bo'lsa (packSize > 1) ikkala birlik tanlanadi
+const hasPack = (it: Item) => (it.packSize || 1) > 1
+const unitName = (it: Item, mode: UnitMode) =>
+  (mode === 'pack' ? it.packUnit : it.unit || 'dona')
+// Tanlangan birlikdagi miqdorni bazaviy (dona) ga aylantirish
+const toBase = (s: SelectedItem) =>
+  s.mode === 'pack' ? s.qty * Math.max(1, s.item.packSize || 1) : s.qty
+// Tanlangan birlikda mavjud maksimal miqdor
+const maxFor = (it: Item, mode: UnitMode) =>
+  mode === 'pack'
+    ? Math.floor((it.quantity || 0) / Math.max(1, it.packSize || 1))
+    : (it.quantity || 0)
 
 type Step = 'event' | 'items' | 'confirm' | 'done' | 'error'
 
@@ -151,15 +169,24 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
     setSelected(prev => {
       const exists = prev.find(s => s.item.id === item.id)
       if (exists) return prev.filter(s => s.item.id !== item.id)
-      return [...prev, { item, qty: 1 }]
+      return [...prev, { item, qty: 1, mode: 'piece' as UnitMode }]
     })
   }
 
   const changeQty = (itemId: string, delta: number) => {
     setSelected(prev => prev.map(s => {
       if (s.item.id !== itemId) return s
-      const newQty = Math.max(1, Math.min(s.item.quantity, s.qty + delta))
+      const max = Math.max(1, maxFor(s.item, s.mode))
+      const newQty = Math.max(1, Math.min(max, s.qty + delta))
       return { ...s, qty: newQty }
+    }))
+  }
+
+  const setItemMode = (itemId: string, mode: UnitMode) => {
+    setSelected(prev => prev.map(s => {
+      if (s.item.id !== itemId) return s
+      const max = Math.max(1, maxFor(s.item, mode))
+      return { ...s, mode, qty: Math.max(1, Math.min(s.qty, max)) }
     }))
   }
 
@@ -167,7 +194,7 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
     if (actionType === 'ADD') {
       return sum + (parseInt(s.newTotalPrice || '0', 10) || 0)
     }
-    return sum + s.item.price * s.qty
+    return sum + s.item.price * toBase(s)
   }, 0)
 
   const handleSubmit = async () => {
@@ -189,7 +216,8 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
           items: selected.map(s => ({
             itemId: s.item.id,
             quantity: s.qty,
-            totalPrice: actionType === 'ADD' ? (parseInt(s.newTotalPrice || '0', 10) || 0) : (s.item.price * s.qty)
+            unitMode: s.mode,
+            totalPrice: actionType === 'ADD' ? (parseInt(s.newTotalPrice || '0', 10) || 0) : (s.item.price * toBase(s))
           }))
         })
       })
@@ -377,7 +405,12 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
                       >
                         <div>
                           <div className={`font-bold text-base tracking-tight ${sel ? 'text-brand-600' : 'text-zinc-800'}`}>{item.name}</div>
-                          <div className="text-xs font-medium text-zinc-500 mt-1">{item.quantity} {item.unit.toLowerCase()} qoldi</div>
+                          <div className="text-xs font-medium text-zinc-500 mt-1">
+                            {item.quantity} {(item.unit || 'dona').toLowerCase()} qoldi
+                            {hasPack(item) && (
+                              <span className="text-zinc-400"> · {Math.floor((item.quantity || 0) / Math.max(1, item.packSize))} {item.packUnit}</span>
+                            )}
+                          </div>
                         </div>
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
                           sel ? 'bg-brand-500 border-none' : 'border-2 border-zinc-300'
@@ -387,22 +420,43 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
                       </button>
 
                       {sel && (
-                        <div className="px-4 pb-4 pt-1 flex items-center gap-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                          <button
-                            onClick={() => changeQty(item.id, -1)}
-                            className="w-10 h-10 rounded-xl bg-white shadow-sm border border-zinc-200 flex items-center justify-center active:scale-95 transition-all text-zinc-600 hover:bg-zinc-50"
-                          >
-                            <Minus size={18} />
-                          </button>
-                          <span className="flex-1 text-center font-bold text-xl text-zinc-900">
-                            {sel.qty} <span className="text-sm text-zinc-500 font-medium">{item.unit.toLowerCase()}</span>
-                          </span>
-                          <button
-                            onClick={() => changeQty(item.id, 1)}
-                            className="w-10 h-10 rounded-xl bg-white shadow-sm border border-zinc-200 flex items-center justify-center active:scale-95 transition-all text-zinc-600 hover:bg-zinc-50"
-                          >
-                            <Plus size={18} />
-                          </button>
+                        <div className="px-4 pb-4 pt-1 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+                          {hasPack(item) && (
+                            <div className="flex bg-zinc-200/50 p-1 rounded-xl shadow-inner">
+                              <button
+                                onClick={() => setItemMode(item.id, 'piece')}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${sel.mode === 'piece' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500'}`}
+                              >
+                                {item.unit || 'dona'}
+                              </button>
+                              <button
+                                onClick={() => setItemMode(item.id, 'pack')}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${sel.mode === 'pack' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500'}`}
+                              >
+                                {item.packUnit} ({item.packSize} {item.unit || 'dona'})
+                              </button>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() => changeQty(item.id, -1)}
+                              className="w-10 h-10 rounded-xl bg-white shadow-sm border border-zinc-200 flex items-center justify-center active:scale-95 transition-all text-zinc-600 hover:bg-zinc-50"
+                            >
+                              <Minus size={18} />
+                            </button>
+                            <span className="flex-1 text-center font-bold text-xl text-zinc-900">
+                              {sel.qty} <span className="text-sm text-zinc-500 font-medium">{unitName(item, sel.mode).toLowerCase()}</span>
+                              {hasPack(item) && sel.mode === 'pack' && (
+                                <span className="block text-[11px] text-zinc-400 font-medium mt-0.5">= {sel.qty * Math.max(1, item.packSize)} {(item.unit || 'dona').toLowerCase()}</span>
+                              )}
+                            </span>
+                            <button
+                              onClick={() => changeQty(item.id, 1)}
+                              className="w-10 h-10 rounded-xl bg-white shadow-sm border border-zinc-200 flex items-center justify-center active:scale-95 transition-all text-zinc-600 hover:bg-zinc-50"
+                            >
+                              <Plus size={18} />
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -436,7 +490,10 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
                     <div>
                       <div className="font-bold text-zinc-800 text-base tracking-tight">{s.item.name}</div>
                       <div className={`${actionType === 'TAKE' ? 'text-rose-500' : 'text-emerald-500'} font-bold text-sm mt-1`}>
-                        {actionType === 'TAKE' ? '-' : '+'}{s.qty} {s.item.unit.toLowerCase()}
+                        {actionType === 'TAKE' ? '-' : '+'}{s.qty} {unitName(s.item, s.mode).toLowerCase()}
+                        {s.mode === 'pack' && (
+                          <span className="text-zinc-400 font-medium"> (= {toBase(s)} {(s.item.unit || 'dona').toLowerCase()})</span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
@@ -455,7 +512,7 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
                         </div>
                       ) : (
                         <div className="font-bold text-zinc-900 text-base tracking-tight" suppressHydrationWarning>
-                          {(s.item.price * s.qty).toLocaleString()} UZS
+                          {(s.item.price * toBase(s)).toLocaleString()} UZS
                         </div>
                       )}
                     </div>

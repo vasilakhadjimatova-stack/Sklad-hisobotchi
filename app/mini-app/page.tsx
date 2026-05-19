@@ -13,7 +13,9 @@ export default async function MiniAppPage() {
     name: i.name,
     quantity: i.quantity,
     unit: i.unit,
-    price: i.price
+    price: i.price,
+    packSize: i.packSize,
+    packUnit: i.packUnit
   }))
 
   return <MiniAppClient items={serializedItems} />
