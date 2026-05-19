@@ -345,7 +345,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                   className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all shadow-inner"
                 />
               </div>
-              <div className="w-full sm:w-48">
+              <div className="w-full sm:w-44">
                 <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Boshlang'ich miqdor ({unitField || 'dona'})</label>
                 <input
                   name="quantity"
@@ -356,8 +356,21 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                   className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
                 />
               </div>
+              <div className="w-full sm:w-44">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Narx — 1 {unitField || 'dona'} (so'm)</label>
+                <input
+                  name="price"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
+                />
+              </div>
             </div>
             {unitConfigBlock}
+            <p className="text-xs text-zinc-900/40 font-medium -mt-1">
+              Narx 1 {unitField || 'dona'} uchun. Pachkali bo'lsa: pachka narxini {packSizeNum} ga bo'lib kiriting (mini-app xarajatni shu narxdan hisoblaydi).
+            </p>
           </>
         )}
 

@@ -20,6 +20,7 @@ export async function createNewItem(formData: FormData) {
   const unit = formData.get('unit')?.toString()?.trim() || 'Dona'
   const packUnit = formData.get('packUnit')?.toString()?.trim() || 'pachka'
   const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
+  const price = Math.max(0, Number(formData.get('price')) || 0) // 1 bazaviy birlik (dona) narxi
 
   if (!name || isNaN(quantity) || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri (Soni 0 dan katta bo'lishi kerak)" }
 
@@ -30,7 +31,7 @@ export async function createNewItem(formData: FormData) {
     const admin = await getAdminUser()
 
     const item = await prisma.item.create({
-      data: { name, quantity, unit, packUnit, packSize }
+      data: { name, quantity, unit, packUnit, packSize, price }
     })
 
     await prisma.transaction.create({
