@@ -133,7 +133,7 @@ export default async function Home() {
         </div>
       </div>
 
-      <AdminPanel items={items.map((i: any) => ({ id: i.id, name: i.name, unit: i.unit, packUnit: i.packUnit, packSize: i.packSize }))} />
+      <AdminPanel items={items.map((i: any) => ({ id: i.id, name: i.name, unit: i.unit, packUnit: i.packUnit, packSize: i.packSize, price: i.price }))} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-10">
         {/* Inventory Table */}

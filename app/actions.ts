@@ -16,13 +16,17 @@ async function getAdminUser() {
 
 export async function createNewItem(formData: FormData) {
   const name = formData.get('name')?.toString()
-  const quantity = Number(formData.get('quantity'))
   const unit = formData.get('unit')?.toString()?.trim() || 'Dona'
   const packUnit = formData.get('packUnit')?.toString()?.trim() || 'pachka'
   const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
   const price = Math.max(0, Number(formData.get('price')) || 0) // 1 bazaviy birlik (dona) narxi
 
-  if (!name || isNaN(quantity) || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri (Soni 0 dan katta bo'lishi kerak)" }
+  // Boshlang'ich miqdor pachka va/yoki donada kiritiladi — bazaviy donaga aylantiriladi
+  const qtyPack = Math.max(0, Math.floor(Number(formData.get('qtyPack')) || 0))
+  const qtyPiece = Math.max(0, Math.floor(Number(formData.get('qtyPiece')) || 0))
+  const quantity = qtyPack * packSize + qtyPiece
+
+  if (!name || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri (Soni 0 dan katta bo'lishi kerak)" }
 
   try {
     const existing = await prisma.item.findUnique({ where: { name } })
@@ -88,8 +92,9 @@ export async function addStock(formData: FormData) {
   }
 }
 
-// Mavjud mahsulotni tahrirlash: nom + birlik/pachka sozlamasi.
+// Mavjud mahsulotni tahrirlash: nom + narx + birlik/pachka sozlamasi.
 // Zaxira (quantity) o'zgarmaydi — u doim bazaviy birlikda (dona) qoladi.
+// Narx 1 bazaviy birlik (dona) uchun; o'zgarsa keyingi chiqimlar yangi narxda hisoblanadi.
 // Nom o'zgarsa tarix buzilmaydi (tranzaksiyalar itemId orqali bog'langan).
 export async function setItemUnit(formData: FormData) {
   const itemId = formData.get('itemId')?.toString()
@@ -113,9 +118,17 @@ export async function setItemUnit(formData: FormData) {
       }
     }
 
+    const data: any = { name, unit, packUnit, packSize }
+
+    // Narx — faqat to'g'ri qiymat (bo'sh emas, son) kelganda yangilanadi
+    const priceRaw = formData.get('price')
+    if (priceRaw !== null && priceRaw.toString().trim() !== '' && !isNaN(Number(priceRaw))) {
+      data.price = Math.max(0, Number(priceRaw))
+    }
+
     await prisma.item.update({
       where: { id: itemId },
-      data: { name, unit, packUnit, packSize }
+      data
     })
 
     revalidatePath('/')

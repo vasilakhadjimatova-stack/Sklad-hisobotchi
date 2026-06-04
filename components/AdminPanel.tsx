@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react'
 import { createNewItem, addStock, setItemUnit } from '@/app/actions'
 import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2 } from 'lucide-react'
 
-type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number }
+type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number }
 
 // O'yin uslubidagi chiroyli ranglar
 const gradientColors = [
@@ -179,12 +179,19 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   const [unitField, setUnitField] = useState('dona')
   const [packUnitField, setPackUnitField] = useState('pachka')
   const [packSizeField, setPackSizeField] = useState('1')
+  const [priceField, setPriceField] = useState('')
+  // Yangi mahsulot boshlang'ich miqdori (pachka + dona)
+  const [qtyPackField, setQtyPackField] = useState('')
+  const [qtyPieceField, setQtyPieceField] = useState('')
 
   const resetUnitFields = () => {
     setNameField('')
     setUnitField('dona')
     setPackUnitField('pachka')
     setPackSizeField('1')
+    setPriceField('')
+    setQtyPackField('')
+    setQtyPieceField('')
   }
 
   const handleTabChange = (tab: 'NEW' | 'ADD' | 'UNIT') => {
@@ -203,6 +210,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
       setUnitField(item.unit || 'dona')
       setPackUnitField(item.packUnit || 'pachka')
       setPackSizeField(String(item.packSize ?? 1))
+      setPriceField(item.price != null ? String(item.price) : '')
     } else {
       resetUnitFields()
     }
@@ -213,6 +221,19 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
       setMsg('Iltimos, katalogdan mahsulotni tanlang')
       setIsError(true)
       return
+    }
+
+    // Yangi mahsulot: pachka + dona dan kamida biri kiritilgan bo'lsin
+    if (activeTab === 'NEW') {
+      const ps = Math.max(1, Math.floor(Number(packSizeField) || 1))
+      // Pachka maydoni faqat packSize > 1 bo'lganda ko'rinadi/yuboriladi (server bilan mos)
+      const pk = ps > 1 ? Math.max(0, Math.floor(Number(qtyPackField) || 0)) : 0
+      const pc = Math.max(0, Math.floor(Number(qtyPieceField) || 0))
+      if (pk * ps + pc <= 0) {
+        setMsg("Boshlang'ich miqdorni kiriting (0 dan katta bo'lsin)")
+        setIsError(true)
+        return
+      }
     }
 
     setLoading(true)
@@ -246,6 +267,11 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
 
   const packSizeNum = Math.max(1, Math.floor(Number(packSizeField) || 1))
   const hasPack = packSizeNum > 1
+
+  // Yangi mahsulot boshlang'ich miqdori — pachka + dona → bazaviy dona
+  const qtyPackNum = Math.max(0, Math.floor(Number(qtyPackField) || 0))
+  const qtyPieceNum = Math.max(0, Math.floor(Number(qtyPieceField) || 0))
+  const totalBaseQty = qtyPackNum * packSizeNum + qtyPieceNum
 
   // Birlik sozlash bloki (NEW va UNIT tab uchun umumiy)
   const unitConfigBlock = (
@@ -293,6 +319,53 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     </div>
   )
 
+  // Yangi mahsulot boshlang'ich miqdori bloki — pachkali bo'lsa pachka + dona, aks holda faqat dona
+  const newQtyBlock = (
+    <div className="w-full">
+      <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
+        Boshlang'ich miqdor {hasPack ? '(pachka va/yoki dona)' : `(${unitField || 'dona'})`}
+      </label>
+      <div className="flex flex-wrap items-start gap-4">
+        {hasPack && (
+          <div className="w-32">
+            <input
+              name="qtyPack"
+              type="number"
+              min="0"
+              value={qtyPackField}
+              onChange={(e) => setQtyPackField(e.target.value)}
+              placeholder="0"
+              className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner text-center"
+            />
+            <span className="block mt-1.5 text-[11px] text-zinc-900/50 font-semibold text-center uppercase tracking-wider">{packUnitField || 'pachka'}</span>
+          </div>
+        )}
+        <div className="w-32">
+          <input
+            name="qtyPiece"
+            type="number"
+            min="0"
+            value={qtyPieceField}
+            onChange={(e) => setQtyPieceField(e.target.value)}
+            placeholder="0"
+            className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner text-center"
+          />
+          <span className="block mt-1.5 text-[11px] text-zinc-900/50 font-semibold text-center uppercase tracking-wider">{unitField || 'dona'}</span>
+        </div>
+        {hasPack && (
+          <div className="flex-1 min-w-[150px] flex items-center pt-1">
+            <div className="px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm font-bold text-emerald-600">
+              Jami: {totalBaseQty} {unitField || 'dona'}
+              {qtyPackNum > 0 && (
+                <span className="text-emerald-600/60 font-medium"> · {qtyPackNum} {packUnitField || 'pachka'}{qtyPieceNum > 0 ? ` ${qtyPieceNum} ${unitField || 'dona'}` : ''}</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div className="glass-card p-6 md:p-8 rounded-2xl mb-10 relative overflow-visible group border border-white/60 shadow-2xl z-20">
       {/* Background glow */}
@@ -330,7 +403,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
           }`}
         >
           <Settings2 size={16} />
-          Tahrirlash <span className="hidden sm:inline">(nom, birlik/pachka)</span>
+          Tahrirlash <span className="hidden sm:inline">(nom, narx, birlik)</span>
         </button>
       </div>
 
@@ -348,18 +421,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                   className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all shadow-inner"
                 />
               </div>
-              <div className="w-full sm:w-44">
-                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Boshlang'ich miqdor ({unitField || 'dona'})</label>
-                <input
-                  name="quantity"
-                  type="number"
-                  required
-                  min="1"
-                  placeholder="0"
-                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
-                />
-              </div>
-              <div className="w-full sm:w-44">
+              <div className="w-full sm:w-52">
                 <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Narx — 1 {unitField || 'dona'} (so'm)</label>
                 <input
                   name="price"
@@ -371,6 +433,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
               </div>
             </div>
             {unitConfigBlock}
+            {newQtyBlock}
             <p className="text-xs text-zinc-900/40 font-medium -mt-1">
               Narx 1 {unitField || 'dona'} uchun. Pachkali bo'lsa: pachka narxini {packSizeNum} ga bo'lib kiriting (mini-app xarajatni shu narxdan hisoblaydi).
             </p>
@@ -414,27 +477,41 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
               />
             </div>
             {selectedItem && (
-              <div className="w-full">
-                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Mahsulot nomi</label>
-                <input
-                  name="name"
-                  type="text"
-                  required
-                  value={nameField}
-                  onChange={(e) => setNameField(e.target.value)}
-                  placeholder="Mahsulot nomi"
-                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
-                />
+              <div className="flex flex-col sm:flex-row gap-5 items-end">
+                <div className="flex-1 w-full">
+                  <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Mahsulot nomi</label>
+                  <input
+                    name="name"
+                    type="text"
+                    required
+                    value={nameField}
+                    onChange={(e) => setNameField(e.target.value)}
+                    placeholder="Mahsulot nomi"
+                    className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
+                  />
+                </div>
+                <div className="w-full sm:w-52">
+                  <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Narx — 1 {unitField || 'dona'} (so'm)</label>
+                  <input
+                    name="price"
+                    type="number"
+                    min="0"
+                    value={priceField}
+                    onChange={(e) => setPriceField(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
+                  />
+                </div>
               </div>
             )}
             {selectedItem && unitConfigBlock}
             {selectedItem && (
               <p className="text-xs text-zinc-900/40 font-medium -mt-1">
-                Nomni o'zgartirsangiz tarix buzilmaydi (operatsiyalar mahsulotga ID orqali bog'langan). Zaxira (qoldiq) ham o'zgarmaydi.
+                Nom yoki pachka/dona o'zgarsa tarix buzilmaydi (operatsiyalar mahsulotga ID orqali bog'langan), zaxira (qoldiq) ham o'zgarmaydi. Narx yangilansa keyingi chiqimlar yangi narxda hisoblanadi.
               </p>
             )}
             {!selectedItem && (
-              <p className="text-sm text-zinc-900/40 font-medium">Nomini yoki pachka/dona sozlamasini o'zgartirish uchun avval mahsulotni tanlang. Zaxira (qoldiq) o'zgarmaydi.</p>
+              <p className="text-sm text-zinc-900/40 font-medium">Nom, narx yoki pachka/dona sozlamasini o'zgartirish uchun avval mahsulotni tanlang. Zaxira (qoldiq) o'zgarmaydi.</p>
             )}
           </>
         )}
