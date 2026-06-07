@@ -45,11 +45,18 @@ function sameEvent(aNorm: string, bNorm: string): boolean {
 
 export default async function AnalyticsPage() {
   const items = await prisma.item.findMany()
-  const transactions = await prisma.transaction.findMany({
-    where: { type: 'TAKE' },
+
+  // TAKE (chiqim) + qaytarish (ADD/RETURN). Qaytgan mahsulot chiqimdan ayiriladi,
+  // shunda har tadbirda SOF ishlatilgan miqdor ko'rinadi. Admin "Kirim qilish"
+  // (eventName yo'q) tadbirga aloqasiz — uni hisobga olmaymiz.
+  const allTx = await prisma.transaction.findMany({
+    where: { type: { in: ['TAKE', 'ADD', 'RETURN'] } },
     include: { item: true },
     orderBy: { createdAt: 'desc' }
   })
+  const transactions = allTx.filter(
+    t => t.type === 'TAKE' || (t.eventName != null && t.eventName.trim() !== '')
+  )
 
   // Har sana uchun: xom nom -> kanonik (birlashtirilgan) nom.
   // Vakil sifatida eng ko'p uchragan / uzunroq variant tanlanadi.
@@ -88,21 +95,35 @@ export default async function AnalyticsPage() {
     return d.toLocaleString('uz-UZ', { month: 'long', year: 'numeric' })
   })
 
-  const monthDataMap: Record<string, { 
-    monthName: string, 
-    totalCost: number, 
-    impulseCost: number,
-    externalEventCount: number,
-    eventsMap: Record<string, any>,
-    productsMap: Record<string, any>
+  // --- Tadbir/mahsulot bo'yicha yig'ish ---
+  // Har mahsulot uchun: olingan (taken) va qaytgan (returned) alohida; sof = taken - returned.
+  // Xarajat ham sof: chiqim summasidan qaytarish summasi ayiriladi.
+  type AggItem = { name: string, unit: string, taken: number, returned: number, cost: number }
+  type AggEvent = { key: string, name: string, date: string, itemsMap: Record<string, AggItem> }
+
+  const getAggItem = (map: Record<string, AggItem>, name: string, unit: string): AggItem => {
+    if (!map[name]) map[name] = { name, unit, taken: 0, returned: 0, cost: 0 }
+    return map[name]
+  }
+  const applyTx = (it: AggItem, isReturn: boolean, qtyBase: number, lineCost: number) => {
+    if (isReturn) {
+      it.returned += qtyBase
+      it.cost -= lineCost
+    } else {
+      it.taken += qtyBase
+      it.cost += lineCost
+    }
+  }
+
+  const globalEventsMap: Record<string, AggEvent> = {}
+  const monthDataMap: Record<string, {
+    monthName: string,
+    eventsMap: Record<string, AggEvent>,
+    productsMap: Record<string, AggItem>
   }> = {}
-
   last3MonthKeys.forEach(m => {
-    monthDataMap[m] = { monthName: m, totalCost: 0, impulseCost: 0, externalEventCount: 0, eventsMap: {}, productsMap: {} }
+    monthDataMap[m] = { monthName: m, eventsMap: {}, productsMap: {} }
   })
-
-  // Global events map for the "Tadbirlar Ketma-ketligi" section
-  const globalEventsMap: Record<string, { key: string, name: string, date: string, totalCost: number, items: any[] }> = {}
 
   transactions.forEach(t => {
     const monthKey = t.createdAt.toLocaleString('uz-UZ', { month: 'long', year: 'numeric' })
@@ -110,82 +131,68 @@ export default async function AnalyticsPage() {
     const rawName = t.eventName || 'Noma\'lum Tadbir'
     const eventName = canonicalByDate[dateStr]?.[rawName] || rawName
     const eventKey = `${dateStr}_${eventName}`
-    const itemCost = t.totalPrice || (Math.abs(t.quantity) * t.item.price)
+    const isReturn = t.type !== 'TAKE'
+    const qtyBase = Math.abs(t.quantity)
+    const lineCost = t.totalPrice || (qtyBase * t.item.price)
 
-    // Global aggregation
+    // Global (Tadbirlar Ketma-ketligi)
     if (!globalEventsMap[eventKey]) {
-      globalEventsMap[eventKey] = { key: eventKey, name: eventName, date: dateStr, totalCost: 0, items: [] }
+      globalEventsMap[eventKey] = { key: eventKey, name: eventName, date: dateStr, itemsMap: {} }
     }
-    const gEvent = globalEventsMap[eventKey]
-    gEvent.totalCost += itemCost
-    gEvent.items.push({
-      name: t.item.name,
-      quantity: Math.abs(t.quantity),
-      cost: itemCost,
-      unit: t.item.unit
-    })
+    applyTx(getAggItem(globalEventsMap[eventKey].itemsMap, t.item.name, t.item.unit), isReturn, qtyBase, lineCost)
 
-    // Monthly aggregation
-    if (monthDataMap[monthKey]) {
-      monthDataMap[monthKey].totalCost += itemCost
-      if (eventName.toLowerCase().includes('impulse')) {
-        monthDataMap[monthKey].impulseCost += itemCost
+    // Oylik
+    const md = monthDataMap[monthKey]
+    if (md) {
+      if (!md.eventsMap[eventKey]) {
+        md.eventsMap[eventKey] = { key: eventKey, name: eventName, date: dateStr, itemsMap: {} }
       }
-
-      if (!monthDataMap[monthKey].eventsMap[eventKey]) {
-        monthDataMap[monthKey].eventsMap[eventKey] = {
-          name: eventName,
-          date: dateStr,
-          totalCost: 0,
-          items: []
-        }
-        // Count as external event if not Impulse
-        if (!eventName.toLowerCase().includes('impulse')) {
-          monthDataMap[monthKey].externalEventCount++
-        }
-      }
-      const mEvent = monthDataMap[monthKey].eventsMap[eventKey]
-      mEvent.totalCost += itemCost
-      mEvent.items.push({
-        name: t.item.name,
-        quantity: Math.abs(t.quantity),
-        cost: itemCost,
-        unit: t.item.unit
-      })
-
-      // Product aggregation per month
-      if (!monthDataMap[monthKey].productsMap[t.item.name]) {
-        monthDataMap[monthKey].productsMap[t.item.name] = {
-          name: t.item.name,
-          quantity: 0,
-          cost: 0,
-          unit: t.item.unit
-        }
-      }
-      const mProd = monthDataMap[monthKey].productsMap[t.item.name]
-      mProd.quantity += Math.abs(t.quantity)
-      mProd.cost += itemCost
+      applyTx(getAggItem(md.eventsMap[eventKey].itemsMap, t.item.name, t.item.unit), isReturn, qtyBase, lineCost)
+      applyTx(getAggItem(md.productsMap, t.item.name, t.item.unit), isReturn, qtyBase, lineCost)
     }
   })
 
-  const monthsArray = last3MonthKeys.map(key => ({
-    monthName: monthDataMap[key].monthName,
-    totalCost: monthDataMap[key].totalCost,
-    impulseCost: monthDataMap[key].impulseCost,
-    externalEventCount: monthDataMap[key].externalEventCount,
-    events: Object.values(monthDataMap[key].eventsMap),
-    products: Object.values(monthDataMap[key].productsMap).sort((a: any, b: any) => b.cost - a.cost)
-  }))
+  // AggItem -> komponent uchun ko'rsatiladigan item (sof miqdor + olingan/qaytgan)
+  const toDisplayItems = (m: Record<string, AggItem>) =>
+    Object.values(m).map(x => ({
+      name: x.name,
+      unit: x.unit,
+      taken: x.taken,
+      returned: x.returned,
+      quantity: x.taken - x.returned, // sof ishlatilgan (bazaviy birlik)
+      cost: x.cost                    // sof xarajat
+    }))
 
-  const allEventsArray = Object.values(globalEventsMap).sort((a, b) => {
-    // Sort by date (we can use the first item's createdAt if we had it, but globalEventsMap keys are date-prefixed)
-    return 0 
+  const eventToDisplay = (e: AggEvent) => {
+    const its = toDisplayItems(e.itemsMap)
+    return {
+      key: e.key,
+      name: e.name,
+      date: e.date,
+      totalCost: its.reduce((s, i) => s + i.cost, 0),
+      items: its
+    }
+  }
+
+  const monthsArray = last3MonthKeys.map(key => {
+    const md = monthDataMap[key]
+    const events = Object.values(md.eventsMap).map(eventToDisplay)
+    const totalCost = events.reduce((s, e) => s + e.totalCost, 0)
+    const impulseCost = events
+      .filter(e => e.name.toLowerCase().includes('impulse'))
+      .reduce((s, e) => s + e.totalCost, 0)
+    const externalEventCount = events.filter(e => !e.name.toLowerCase().includes('impulse')).length
+    const products = toDisplayItems(md.productsMap).sort((a, b) => b.cost - a.cost)
+    return { monthName: md.monthName, totalCost, impulseCost, externalEventCount, events, products }
   })
+
+  const allEventsArray = Object.values(globalEventsMap).map(eventToDisplay)
 
   const recentTransactions = transactions.slice(0, 15).map(t => ({
     id: t.id,
     itemName: t.item.name,
-    quantity: t.quantity,
+    quantity: t.quantity, // ishorali: chiqim manfiy, qaytarish musbat
+    type: t.type,
     totalPrice: t.totalPrice || (Math.abs(t.quantity) * t.item.price),
     eventName: t.eventName,
     createdAt: t.createdAt.toLocaleDateString('uz-UZ'),
@@ -193,7 +200,7 @@ export default async function AnalyticsPage() {
   }))
 
   return (
-    <AnalyticsDashboard 
+    <AnalyticsDashboard
       months={monthsArray}
       totalInventoryValue={totalInventoryValue}
       totalEvents={allEventsArray.length}

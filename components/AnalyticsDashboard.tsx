@@ -6,9 +6,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 
 type Item = {
   name: string
-  quantity: number
-  cost: number
+  quantity: number  // sof ishlatilgan (olingan - qaytgan), bazaviy birlikda
+  cost: number      // sof xarajat
   unit: string
+  taken?: number    // jami olingan (chiqim)
+  returned?: number // jami qaytgan (kirim)
 }
 
 type Event = {
@@ -36,6 +38,20 @@ type RecentTransaction = {
   eventName: string | null
   createdAt: string
   unit: string
+  type: string // 'TAKE' (chiqim) | 'ADD' / 'RETURN' (qaytarish)
+}
+
+// Sof miqdor yorlig'i: chiqim "-N", qaytarish ko'p bo'lsa "+N" ko'rinadi
+const netLabel = (item: Item) => (item.quantity >= 0 ? `-${item.quantity}` : `+${-item.quantity}`)
+
+// Qaytgan mahsulot bo'lsa "olingan X · qaytdi Y" eslatmasi
+function ReturnNote({ item }: { item: Item }) {
+  if (!item.returned || item.returned <= 0) return null
+  return (
+    <div className="text-[10px] text-zinc-900/40 font-medium mt-1">
+      {item.taken} olingan · <span className="text-emerald-500 font-bold">{item.returned} qaytdi</span>
+    </div>
+  )
 }
 
 export default function AnalyticsDashboard({ 
@@ -177,7 +193,8 @@ export default function AnalyticsDashboard({
                             <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-white/40 border border-white/60">
                               <div>
                                 <div className="text-sm font-medium text-zinc-900/80">{item.name}</div>
-                                <div className="text-xs text-rose-400 font-bold">-{item.quantity} {item.unit.toLowerCase()}</div>
+                                <div className="text-xs text-rose-400 font-bold">{netLabel(item)} {item.unit.toLowerCase()}</div>
+                                <ReturnNote item={item} />
                               </div>
                               <div className="text-sm text-emerald-400 font-bold" suppressHydrationWarning>
                                 {item.cost.toLocaleString('uz-UZ')} UZS
@@ -217,7 +234,9 @@ export default function AnalyticsDashboard({
                             {t.eventName || 'Noma\'lum'} • {t.createdAt}
                           </div>
                         </td>
-                        <td className="p-6 text-right font-black text-rose-400">-{Math.abs(t.quantity)} {t.unit.toLowerCase()}</td>
+                        <td className={`p-6 text-right font-black ${t.type === 'TAKE' ? 'text-rose-400' : 'text-emerald-500'}`}>
+                          {t.type === 'TAKE' ? '-' : '+'}{Math.abs(t.quantity)} {t.unit.toLowerCase()}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -326,8 +345,9 @@ export default function AnalyticsDashboard({
                                   <div>
                                     <div className="text-sm font-bold text-zinc-900 mb-1">{item.name}</div>
                                     <div className="inline-block px-2 py-0.5 rounded bg-rose-50 text-rose-500 text-xs font-bold">
-                                      -{item.quantity} {item.unit.toLowerCase()}
+                                      {netLabel(item)} {item.unit.toLowerCase()}
                                     </div>
+                                    <ReturnNote item={item} />
                                   </div>
                                   <div className="text-right text-sm font-black text-emerald-600" suppressHydrationWarning>
                                     {item.cost.toLocaleString('uz-UZ')} <span className="text-[10px] text-emerald-400">UZS</span>
@@ -408,8 +428,9 @@ export default function AnalyticsDashboard({
                                 <td className="p-4 pl-8">
                                   <div className="font-bold text-sm text-zinc-900 group-hover:text-brand-600 transition-colors">{item.name}</div>
                                   <div className="text-xs font-medium text-rose-500 mt-0.5">
-                                    -{item.quantity} {item.unit.toLowerCase()}
+                                    {netLabel(item)} {item.unit.toLowerCase()}
                                   </div>
+                                  <ReturnNote item={item} />
                                 </td>
                                 <td className="p-4 pr-8 text-right">
                                   <div className="font-black text-sm text-zinc-900" suppressHydrationWarning>
