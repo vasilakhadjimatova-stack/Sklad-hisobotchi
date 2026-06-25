@@ -220,7 +220,7 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
         const d = await res.json()
         if (d.error) {
           setVoiceMsg(d.needKey
-            ? "AI kaliti sozlanmagan. (Admin: Railway'ga bepul GEMINI_API_KEY qo'shsin.)"
+            ? "AI kaliti sozlanmagan. (Admin: Railway'ga ANTHROPIC_API_KEY qo'shsin.)"
             : `Tushunilmadi: "${transcript}". Qaytadan ayting yoki qo'lda kiriting.`)
           return
         }
