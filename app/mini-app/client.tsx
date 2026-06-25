@@ -155,7 +155,10 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
   }
 
   const displayName = tgUser?.name || manualName || ''
-  const userId = tgUser?.id || `miniapp_user`
+  // Telegram'siz (mustaqil PWA) — har bir xodim ismi bo'yicha alohida foydalanuvchi
+  const userId = tgUser?.id || (manualName.trim()
+    ? `web_${manualName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`
+    : 'web_guest')
 
   const filteredItems = items.filter(i => {
     if (!search) return true;
@@ -563,8 +566,16 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
               </div>
               <h2 className="text-3xl font-black text-zinc-900 tracking-tight">Muvaffaqiyatli!</h2>
               <p className="text-zinc-500 font-medium text-base text-center leading-relaxed max-w-[250px]">
-                {actionType === 'TAKE' ? 'Chiqim' : 'Kirim'} saqlandi.<br />Oyna avtomatik yopiladi...
+                {actionType === 'TAKE' ? 'Chiqim' : 'Kirim'} saqlandi.{tgUser ? <><br />Oyna avtomatik yopiladi...</> : ''}
               </p>
+              {!tgUser && (
+                <button
+                  onClick={() => { setSelected([]); setSearch(''); setEventName(''); setStep('event') }}
+                  className="mt-4 px-8 py-4 rounded-2xl bg-gradient-to-r from-brand-500 to-violet-500 text-white font-bold text-sm uppercase tracking-widest active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(99,102,241,0.3)]"
+                >
+                  Yangi amal
+                </button>
+              )}
             </div>
           )}
 
