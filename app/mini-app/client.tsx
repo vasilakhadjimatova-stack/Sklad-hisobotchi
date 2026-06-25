@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft } from 'lucide-react'
+import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft, Mic } from 'lucide-react'
 
 type Item = {
   id: string
@@ -119,6 +119,8 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
   const [errorMsg, setErrorMsg] = useState('')
   const [tgUser, setTgUser] = useState<{ id: string; name: string } | null>(null)
   const [manualName, setManualName] = useState('')
+  const [listening, setListening] = useState(false)
+  const [voiceMsg, setVoiceMsg] = useState('')
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -165,6 +167,72 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
     .map(e => (e || '').trim())
     .filter(e => e && e.toLowerCase() !== 'impulse')
   ].slice(0, 5)
+
+  // Gemini natijasini formaga to'ldirish
+  const applyVoice = (d: any) => {
+    if (d.action === 'ADD' || d.action === 'TAKE') setActionType(d.action)
+    if (d.eventName) setEventName(String(d.eventName))
+    const newSel: SelectedItem[] = []
+    for (const it of (d.items || [])) {
+      const qty = Math.max(1, parseInt(String(it.quantity ?? 1), 10) || 1)
+      let match = items.find(i => i.name === it.itemName)
+      if (!match) {
+        const t = normalize(String(it.itemName || ''))
+        if (t) match = items.find(i => { const n = normalize(i.name); return n.includes(t) || t.includes(n) })
+      }
+      if (match && !newSel.find(s => s.item.id === match!.id)) {
+        newSel.push({ item: match, qty, mode: 'piece' })
+      }
+    }
+    if (newSel.length === 0) {
+      setVoiceMsg(`"${d.transcript || ''}" — mahsulot topilmadi. Qo'lda tanlang.`)
+      setStep('items')
+      return
+    }
+    setSelected(newSel)
+    setVoiceMsg('')
+    setStep(d.eventName ? 'confirm' : 'event')
+  }
+
+  // 🎤 Ovozli kiritish — brauzer ovozni matnga, Gemini tahlil qiladi
+  const startVoice = () => {
+    const SR = (typeof window !== 'undefined') &&
+      ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition)
+    if (!SR) {
+      setVoiceMsg("Bu qurilma ovozli kiritishni qo'llamaydi. Qo'lda kiriting.")
+      return
+    }
+    const rec = new SR()
+    rec.lang = 'uz-UZ'
+    rec.interimResults = false
+    rec.maxAlternatives = 1
+    setVoiceMsg(''); setListening(true)
+    rec.onresult = async (e: any) => {
+      const transcript = e.results?.[0]?.[0]?.transcript || ''
+      setListening(false)
+      if (!transcript.trim()) { setVoiceMsg("Ovoz eshitilmadi, qaytadan urinib ko'ring."); return }
+      setVoiceMsg(`Eshitildi: "${transcript}" — tahlil qilinmoqda…`)
+      try {
+        const res = await fetch(`${window.location.origin}/api/mini-app/voice`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript, events: eventPresets }),
+        })
+        const d = await res.json()
+        if (d.error) {
+          setVoiceMsg(d.needKey
+            ? "AI kaliti sozlanmagan. (Admin: Railway'ga bepul GEMINI_API_KEY qo'shsin.)"
+            : `Tushunilmadi: "${transcript}". Qaytadan ayting yoki qo'lda kiriting.`)
+          return
+        }
+        applyVoice(d)
+      } catch {
+        setVoiceMsg("Server bilan aloqa yo'q.")
+      }
+    }
+    rec.onerror = () => { setListening(false); setVoiceMsg("Mikrofonga ruxsat bering yoki qaytadan urining.") }
+    rec.onend = () => setListening(false)
+    try { rec.start() } catch { setListening(false) }
+  }
 
   const filteredItems = items.filter(i => {
     if (!search) return true;
@@ -311,9 +379,26 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
                 </button>
               </div>
 
+              <button
+                onClick={startVoice}
+                disabled={listening}
+                className={`w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm border ${
+                  listening
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 animate-pulse'
+                    : 'bg-gradient-to-r from-brand-500/10 to-violet-500/10 border-brand-500/30 text-brand-600 active:scale-[0.98]'
+                }`}
+              >
+                <Mic size={18} /> {listening ? 'Tinglanmoqda…' : '🎤 Ovozli kiritish'}
+              </button>
+              {voiceMsg && (
+                <div className="text-xs font-medium text-zinc-600 bg-white/70 border border-white/80 rounded-xl px-4 py-3 leading-relaxed">
+                  {voiceMsg}
+                </div>
+              )}
+
               <div>
                 <h2 className="text-2xl font-bold text-zinc-900 mb-1 tracking-tight">Qaysi tadbir?</h2>
-                <p className="text-zinc-500 text-sm font-medium">Tadbir nomini tanlang yoki kiriting</p>
+                <p className="text-zinc-500 text-sm font-medium">Yoki tadbir nomini tanlang / kiriting</p>
               </div>
 
               {/* If Telegram didn't provide name - ask manually */}
