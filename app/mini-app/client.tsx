@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar } from 'lucide-react'
+import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft } from 'lucide-react'
 
 type Item = {
   id: string
@@ -108,7 +108,7 @@ declare global {
   }
 }
 
-export default function MiniAppClient({ items }: { items: Item[] }) {
+export default function MiniAppClient({ items, recentEvents = [] }: { items: Item[], recentEvents?: string[] }) {
   const [mounted, setMounted] = useState(false)
   const [actionType, setActionType] = useState<'TAKE' | 'ADD'>('TAKE')
   const [step, setStep] = useState<Step>('event')
@@ -159,6 +159,12 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
   const userId = tgUser?.id || (manualName.trim()
     ? `web_${manualName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`
     : 'web_guest')
+
+  // Tadbir tugmalari: "Impulse" doim + oxirgi kiritilgan nomlar (bazadan)
+  const eventPresets = ['Impulse', ...recentEvents
+    .map(e => (e || '').trim())
+    .filter(e => e && e.toLowerCase() !== 'impulse')
+  ].slice(0, 5)
 
   const filteredItems = items.filter(i => {
     if (!search) return true;
@@ -254,7 +260,16 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
         {/* Header */}
         <div className="sticky top-0 z-30 bg-white/60 backdrop-blur-xl border-b border-white/80 shadow-sm px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl ${actionType === 'TAKE' ? 'bg-brand-500/10 border-brand-500/20' : 'bg-emerald-500/10 border-emerald-500/20'} border flex items-center justify-center shadow-inner`}>
+            {(step === 'items' || step === 'confirm') && (
+              <button
+                onClick={() => setStep(step === 'confirm' ? 'items' : 'event')}
+                aria-label="Orqaga"
+                className="w-10 h-10 rounded-xl bg-white/70 border border-white/80 shadow-sm flex items-center justify-center text-zinc-600 active:scale-95 transition-all shrink-0"
+              >
+                <ArrowLeft size={20} />
+              </button>
+            )}
+            <div className={`w-10 h-10 rounded-xl ${actionType === 'TAKE' ? 'bg-brand-500/10 border-brand-500/20' : 'bg-emerald-500/10 border-emerald-500/20'} border flex items-center justify-center shadow-inner shrink-0`}>
               <Package size={20} className={actionType === 'TAKE' ? 'text-brand-500' : 'text-emerald-500'} />
             </div>
             <div>
@@ -316,7 +331,7 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
               )}
 
               <div className="space-y-3">
-                {['Impulse', 'Assodiq', 'Nodir aka', 'Hamza'].map(preset => (
+                {eventPresets.map(preset => (
                   <button
                     key={preset}
                     onClick={() => setEventName(preset)}
@@ -335,7 +350,7 @@ export default function MiniAppClient({ items }: { items: Item[] }) {
                 <input
                   type="text"
                   placeholder="Boshqa tadbir nomini yozing..."
-                  value={!['Impulse', 'Assodiq', 'Nodir aka', 'Hamza'].includes(eventName) ? eventName : ''}
+                  value={!eventPresets.includes(eventName) ? eventName : ''}
                   onChange={e => setEventName(e.target.value)}
                   className="w-full bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl py-4 px-5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium"
                 />

@@ -18,5 +18,28 @@ export default async function MiniAppPage() {
     packUnit: i.packUnit
   }))
 
-  return <MiniAppClient items={serializedItems} />
+  // Oxirgi kiritilgan tadbir nomlari (chiqimlardan) — tugma sifatida ko'rsatamiz.
+  let recentEvents: string[] = []
+  try {
+    const recentTx = await prisma.transaction.findMany({
+      where: { type: 'TAKE', eventName: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      select: { eventName: true },
+      take: 80,
+    })
+    const seen = new Set<string>()
+    for (const t of recentTx) {
+      const e = (t.eventName || '').trim()
+      if (!e) continue
+      const key = e.toLowerCase()
+      if (key === 'impulse' || key.startsWith('inventar') || seen.has(key)) continue
+      seen.add(key)
+      recentEvents.push(e)
+      if (recentEvents.length >= 4) break
+    }
+  } catch {
+    recentEvents = []
+  }
+
+  return <MiniAppClient items={serializedItems} recentEvents={recentEvents} />
 }
