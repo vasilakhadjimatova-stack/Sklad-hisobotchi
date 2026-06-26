@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft, Mic } from 'lucide-react'
+import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft, Mic, History, RotateCcw } from 'lucide-react'
 
 type Item = {
   id: string
@@ -35,7 +35,7 @@ const maxFor = (it: Item, mode: UnitMode) =>
     ? Math.floor((it.quantity || 0) / Math.max(1, it.packSize || 1))
     : (it.quantity || 0)
 
-type Step = 'event' | 'items' | 'confirm' | 'done' | 'error'
+type Step = 'event' | 'items' | 'confirm' | 'done' | 'error' | 'history'
 
 const cyrillicToLatinMap: Record<string, string> = {
   'а':'a', 'б':'b', 'в':'v', 'г':'g', 'д':'d', 'е':'e', 'ё':'yo', 'ж':'j', 'з':'z',
@@ -131,6 +131,11 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
   const [voiceMsg, setVoiceMsg] = useState('')
   const mediaRecRef = useRef<any>(null)
   const chunksRef = useRef<any[]>([])
+  const [history, setHistory] = useState<any[]>([])
+  const [histLoading, setHistLoading] = useState(false)
+  const [histFilter, setHistFilter] = useState<string>('all')
+  const [histSearch, setHistSearch] = useState('')
+  const [cancelingId, setCancelingId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -202,6 +207,34 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
     setSelected(newSel)
     setVoiceMsg('')
     setStep(d.eventName ? 'confirm' : 'event')
+  }
+
+  // 📋 Amallar tarixi: yuklash + bekor qilish
+  const loadHistory = async (type: string) => {
+    setHistLoading(true)
+    try {
+      const qs = type === 'TAKE' || type === 'ADD' ? `?type=${type}` : ''
+      const res = await fetch(`${window.location.origin}/api/mini-app/history${qs}`)
+      const d = await res.json()
+      setHistory(Array.isArray(d.rows) ? d.rows : [])
+    } catch { setHistory([]) }
+    setHistLoading(false)
+  }
+  const openHistory = () => { setHistFilter('all'); setHistSearch(''); setStep('history'); loadHistory('all') }
+  const cancelTx = async (id: string) => {
+    if (cancelingId) return
+    if (!window.confirm('Bu amal bekor qilinsinmi? Qoldiq tiklanadi.')) return
+    setCancelingId(id)
+    try {
+      const res = await fetch(`${window.location.origin}/api/mini-app/history`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txId: id }),
+      })
+      const d = await res.json()
+      if (d.success) setHistory(prev => prev.filter(r => r.id !== id))
+      else alert(d.error || 'Bekor qilinmadi')
+    } catch { alert("Server bilan aloqa yo'q") }
+    setCancelingId(null)
   }
 
   // 🎤 Ovozli kiritish — OpenAI eshitadi (ovoz→matn), Claude tushunadi.
@@ -399,8 +432,14 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
           {/* STEP 1: Event Name */}
           {step === 'event' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <button
+                onClick={openHistory}
+                className="w-full py-3 rounded-2xl bg-white/60 border border-white/80 text-zinc-600 font-bold text-xs flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
+              >
+                <History size={15} /> Amallar tarixi · bekor qilish
+              </button>
               <div className="flex bg-zinc-200/50 p-1 rounded-xl mb-6 shadow-inner">
-                <button 
+                <button
                   onClick={() => setActionType('TAKE')}
                   className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all ${actionType === 'TAKE' ? 'bg-white shadow-sm text-zinc-900' : 'text-zinc-500 hover:text-zinc-700'}`}
                 >
@@ -697,6 +736,86 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
                   )}
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* AMALLAR TARIXI — filtr + bekor qilish */}
+          {step === 'history' && (
+            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setStep('event')}
+                  aria-label="Orqaga"
+                  className="w-10 h-10 rounded-xl bg-white/70 border border-white/80 shadow-sm flex items-center justify-center text-zinc-600 active:scale-95 transition-all shrink-0"
+                >
+                  <ArrowLeft size={20} />
+                </button>
+                <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Amallar tarixi</h2>
+              </div>
+
+              <div className="flex gap-2">
+                {(([['all', 'Hammasi'], ['TAKE', 'Chiqim'], ['ADD', 'Kirim']]) as [string, string][]).map(([k, label]) => (
+                  <button
+                    key={k}
+                    onClick={() => { setHistFilter(k); loadHistory(k) }}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${histFilter === k ? 'bg-brand-500 text-white border-brand-500 shadow-sm' : 'bg-white/60 text-zinc-500 border-white/80'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input
+                  value={histSearch}
+                  onChange={e => setHistSearch(e.target.value)}
+                  placeholder="Mahsulot yoki tadbir..."
+                  className="w-full bg-white/70 border border-white/80 shadow-sm rounded-2xl py-3 pl-11 pr-4 text-sm font-medium text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                />
+              </div>
+
+              {histLoading ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-7 h-7 rounded-full border-4 border-brand-500 border-t-transparent animate-spin"></div>
+                </div>
+              ) : (
+                <div className="space-y-2 pb-8">
+                  {history.filter(r => {
+                    const s = histSearch.trim().toLowerCase()
+                    if (!s) return true
+                    return (r.itemName || '').toLowerCase().includes(s) || (r.eventName || '').toLowerCase().includes(s) || (r.userName || '').toLowerCase().includes(s)
+                  }).map(r => {
+                    const isTake = r.type === 'TAKE'
+                    const abs = Math.abs(r.quantity)
+                    const dt = new Date(r.createdAt)
+                    const dateStr = dt.toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit' }) + ' ' + dt.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div key={r.id} className="bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl p-4 flex items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold text-zinc-800 text-sm truncate">{r.itemName}</div>
+                          <div className={`${isTake ? 'text-rose-500' : 'text-emerald-500'} font-bold text-sm`}>
+                            {isTake ? '−' : '+'}{abs} {(r.unit || 'dona').toLowerCase()}
+                          </div>
+                          <div className="text-[11px] text-zinc-400 truncate mt-0.5">
+                            {r.eventName || '—'} · {dateStr}{r.userName ? ' · ' + r.userName : ''}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => cancelTx(r.id)}
+                          disabled={cancelingId === r.id}
+                          className="shrink-0 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 font-bold text-xs flex items-center gap-1 active:scale-95 transition-all disabled:opacity-50"
+                        >
+                          {cancelingId === r.id ? '…' : <><RotateCcw size={13} /> Bekor</>}
+                        </button>
+                      </div>
+                    )
+                  })}
+                  {history.length === 0 && (
+                    <div className="text-center text-zinc-400 text-sm py-12">Amallar yo'q</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
