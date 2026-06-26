@@ -2,19 +2,64 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import prisma from '@/lib/prisma'
 
-// Ovozli matnni (transcript) Claude (Anthropic) bilan ombor amaliga aylantiradi:
-// { action, eventName, items: [{itemName, quantity}] }
+export const maxDuration = 60
+
+// 1) Ovoz (audio) -> matn: OpenAI gpt-4o-transcribe
+// 2) Matn -> ombor amali: Claude (claude-opus-4-8)
+//    => { transcript, action, eventName, items: [{itemName, quantity}] }
+
+async function transcribeOpenAI(audioB64: string, mimeType: string, key: string): Promise<string> {
+  const buf = Buffer.from(audioB64, 'base64')
+  const ext = mimeType.includes('mp4') || mimeType.includes('m4a') ? 'mp4'
+    : mimeType.includes('ogg') ? 'ogg'
+    : mimeType.includes('wav') ? 'wav'
+    : mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3'
+    : 'webm'
+  const form = new FormData()
+  form.append('file', new Blob([buf], { type: mimeType || 'audio/webm' }), `audio.${ext}`)
+  form.append('model', 'gpt-4o-transcribe')
+  form.append('language', 'uz')
+  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}` },
+    body: form,
+  })
+  if (!r.ok) {
+    const t = await r.text().catch(() => '')
+    throw new Error(`OpenAI ${r.status}: ${t.slice(0, 300)}`)
+  }
+  const d: any = await r.json()
+  return String(d.text || '')
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { transcript, events } = await req.json()
-    if (!transcript || !String(transcript).trim()) {
+    const body = await req.json()
+    const { audio, mimeType, events } = body
+    let transcript: string = body.transcript || ''
+
+    // 1) Audio bo'lsa — OpenAI bilan matnga aylantiramiz
+    if (!transcript && audio) {
+      const okey = process.env.OPENAI_API_KEY
+      if (!okey) {
+        return NextResponse.json({ error: 'Ovoz kaliti sozlanmagan', needKey: 'openai' }, { status: 200 })
+      }
+      try {
+        transcript = await transcribeOpenAI(audio, mimeType || 'audio/webm', okey)
+      } catch (e) {
+        console.error('Transcribe error:', e)
+        return NextResponse.json({ error: "Ovozni eshitib bo'lmadi, qaytadan urinib ko'ring" }, { status: 200 })
+      }
+    }
+
+    if (!transcript || !transcript.trim()) {
       return NextResponse.json({ error: 'Ovoz tushunilmadi' }, { status: 200 })
     }
 
-    const key = process.env.ANTHROPIC_API_KEY
-    if (!key) {
-      return NextResponse.json(
-        { error: 'AI kaliti sozlanmagan', needKey: true }, { status: 200 })
+    // 2) Matnni Claude bilan tahlil qilamiz
+    const akey = process.env.ANTHROPIC_API_KEY
+    if (!akey) {
+      return NextResponse.json({ error: 'AI kaliti sozlanmagan', needKey: 'anthropic', transcript }, { status: 200 })
     }
 
     const dbItems = await prisma.item.findMany({ select: { name: true } })
@@ -35,14 +80,13 @@ FAQAT JSON qaytar, boshqa hech qanday matn yozma:
 {"action":"TAKE","eventName":"Impulse","items":[{"itemName":"Stakan 25","quantity":5}]}
 Agar mazmun tushunarsiz bo'lsa: {"error":"Tushunarsiz"}`
 
-    const client = new Anthropic({ apiKey: key })
+    const client = new Anthropic({ apiKey: akey })
     const msg = await client.messages.create({
       model: 'claude-opus-4-8',
       max_tokens: 1024,
       system,
-      // Tezroq javob (oddiy ajratish vazifasi)
       output_config: { effort: 'low' },
-      messages: [{ role: 'user', content: `Gap: "${String(transcript).slice(0, 500)}"` }],
+      messages: [{ role: 'user', content: `Gap: "${transcript.slice(0, 500)}"` }],
     } as any)
 
     let text = ''
@@ -61,7 +105,7 @@ Agar mazmun tushunarsiz bo'lsa: {"error":"Tushunarsiz"}`
     }
     return NextResponse.json({ ...parsed, transcript }, { status: 200 })
   } catch (err) {
-    console.error('Voice parse error:', err)
+    console.error('Voice error:', err)
     return NextResponse.json({ error: 'AI vaqtincha javob bermadi' }, { status: 200 })
   }
 }

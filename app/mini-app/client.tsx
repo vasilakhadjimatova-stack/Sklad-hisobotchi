@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft, Mic } from 'lucide-react'
 
 type Item = {
@@ -83,6 +83,14 @@ const getSearchableText = (itemName: string) => {
   return normName + " " + extras.join(" ");
 }
 
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onloadend = () => resolve(String(r.result).split(',')[1] || '')
+    r.onerror = reject
+    r.readAsDataURL(blob)
+  })
+
 declare global {
   interface Window {
     Telegram?: {
@@ -121,6 +129,8 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
   const [manualName, setManualName] = useState('')
   const [listening, setListening] = useState(false)
   const [voiceMsg, setVoiceMsg] = useState('')
+  const mediaRecRef = useRef<any>(null)
+  const chunksRef = useRef<any[]>([])
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -194,34 +204,52 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
     setStep(d.eventName ? 'confirm' : 'event')
   }
 
-  // 🎤 Ovozli kiritish — brauzer ovozni matnga, Gemini tahlil qiladi
-  const startVoice = () => {
-    const SR = (typeof window !== 'undefined') &&
-      ((window as any).webkitSpeechRecognition || (window as any).SpeechRecognition)
-    if (!SR) {
-      setVoiceMsg("Bu qurilma ovozli kiritishni qo'llamaydi. Qo'lda kiriting.")
+  // 🎤 Ovozli kiritish — OpenAI eshitadi (ovoz→matn), Claude tushunadi.
+  // Bir marta bosib boshlanadi, yana bosib to'xtaydi (yoki 20s da avto).
+  const startVoice = async () => {
+    if (listening) {
+      try { mediaRecRef.current?.stop() } catch {}
       return
     }
-    const rec = new SR()
-    rec.lang = 'uz-UZ'
-    rec.interimResults = false
-    rec.maxAlternatives = 1
-    setVoiceMsg(''); setListening(true)
-    rec.onresult = async (e: any) => {
-      const transcript = e.results?.[0]?.[0]?.transcript || ''
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setVoiceMsg("Bu qurilma mikrofonni qo'llamaydi. Qo'lda kiriting.")
+      return
+    }
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setVoiceMsg("Mikrofonga ruxsat berilmadi. Sozlamalardan ruxsat bering.")
+      return
+    }
+    let mr: MediaRecorder
+    try {
+      mr = new MediaRecorder(stream)
+    } catch {
+      stream.getTracks().forEach(t => t.stop())
+      setVoiceMsg("Ovoz yozib bo'lmadi.")
+      return
+    }
+    chunksRef.current = []
+    mr.ondataavailable = (e: BlobEvent) => { if (e.data && e.data.size) chunksRef.current.push(e.data) }
+    mr.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop())
       setListening(false)
-      if (!transcript.trim()) { setVoiceMsg("Ovoz eshitilmadi, qaytadan urinib ko'ring."); return }
-      setVoiceMsg(`Eshitildi: "${transcript}" — tahlil qilinmoqda…`)
+      const blob = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' })
+      if (blob.size < 800) { setVoiceMsg("Ovoz juda qisqa — qaytadan urinib ko'ring."); return }
+      setVoiceMsg('Tahlil qilinmoqda…')
       try {
+        const b64 = await blobToBase64(blob)
         const res = await fetch(`${window.location.origin}/api/mini-app/voice`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript, events: eventPresets }),
+          body: JSON.stringify({ audio: b64, mimeType: blob.type, events: eventPresets }),
         })
         const d = await res.json()
         if (d.error) {
-          setVoiceMsg(d.needKey
-            ? "AI kaliti sozlanmagan. (Admin: Railway'ga ANTHROPIC_API_KEY qo'shsin.)"
-            : `Tushunilmadi: "${transcript}". Qaytadan ayting yoki qo'lda kiriting.`)
+          setVoiceMsg(
+            d.needKey === 'openai' ? "Ovoz kaliti sozlanmagan. (Admin: Railway'ga OPENAI_API_KEY qo'shsin.)"
+            : d.needKey === 'anthropic' ? "AI kaliti sozlanmagan. (Admin: Railway'ga ANTHROPIC_API_KEY qo'shsin.)"
+            : `Tushunilmadi${d.transcript ? `: "${d.transcript}"` : ''}. Qaytadan ayting yoki qo'lda kiriting.`)
           return
         }
         applyVoice(d)
@@ -229,9 +257,16 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
         setVoiceMsg("Server bilan aloqa yo'q.")
       }
     }
-    rec.onerror = () => { setListening(false); setVoiceMsg("Mikrofonga ruxsat bering yoki qaytadan urining.") }
-    rec.onend = () => setListening(false)
-    try { rec.start() } catch { setListening(false) }
+    mediaRecRef.current = mr
+    setVoiceMsg("Tinglanmoqda… (to'xtatish uchun yana bosing)")
+    setListening(true)
+    try {
+      mr.start()
+      setTimeout(() => { if (mr.state === 'recording') { try { mr.stop() } catch {} } }, 20000)
+    } catch {
+      setListening(false)
+      setVoiceMsg("Ovoz yozib bo'lmadi.")
+    }
   }
 
   const filteredItems = items.filter(i => {
@@ -381,14 +416,13 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
 
               <button
                 onClick={startVoice}
-                disabled={listening}
                 className={`w-full py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm border ${
                   listening
                     ? 'bg-rose-500/10 border-rose-500/30 text-rose-600 animate-pulse'
                     : 'bg-gradient-to-r from-brand-500/10 to-violet-500/10 border-brand-500/30 text-brand-600 active:scale-[0.98]'
                 }`}
               >
-                <Mic size={18} /> {listening ? 'Tinglanmoqda…' : '🎤 Ovozli kiritish'}
+                <Mic size={18} /> {listening ? "⏹ Tinglanmoqda… (bosib to'xtating)" : '🎤 Ovozli kiritish'}
               </button>
               {voiceMsg && (
                 <div className="text-xs font-medium text-zinc-600 bg-white/70 border border-white/80 rounded-xl px-4 py-3 leading-relaxed">
