@@ -71,7 +71,8 @@ Mavjud mahsulotlar: [${itemNames}]
 Mavjud tadbirlar: [${eventList}]
 
 Qoidalar:
-- "action": olindi/chiqdi/ketdi/berildi => "TAKE"; qaytdi/qo'shildi/keldi/kirim => "ADD". Aniq bo'lmasa "TAKE".
+- "action": olindi/chiqdi/ketdi/berildi => "TAKE"; qaytdi/qo'shildi/keldi/kirim/qaytarib ber => "ADD". Aniq bo'lmasa "TAKE".
+- BEKOR QILISH: "bekor qil"/"bekor qilindi"/"xato olindi"/"noto'g'ri olindi"/"ortga qaytar"/"qaytarib qo'y" — bu olingan narsani QAYTARISH, ya'ni action "ADD" (qoldiqни tiklaydi). Faqat aniq "kirimni/qo'shilganni bekor qil" desa => "TAKE".
 - "eventName": qaysi tadbir yoki kim uchun (masalan Impulse, Assodiq). Aytilmasa null.
 - "items": massiv; har biri {"itemName": "...", "quantity": raqam}. itemName ni yuqoridagi mahsulotlar ro'yxatiga IMKON QADAR moslashtir. quantity butun raqam (so'z bilan aytilsa raqamga: besh=5, o'n=10).
 - Bir nechta mahsulot aytilsa, hammasini items ga qo'sh.
