@@ -69,7 +69,9 @@ export async function POST(req: NextRequest) {
     const itemNames = dbItems.map(i => i.name).join(', ')
     const eventList = Array.isArray(events) ? events.join(', ') : ''
 
+    const todayTashkent = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString().slice(0, 10)
     const system = `Sen ombor xodimi yordamchisisan. O'zbekcha gapdan ombor amalini ajratasan.
+Bugungi sana (Toshkent): ${todayTashkent}.
 Mavjud mahsulotlar: [${itemNames}]
 Mavjud tadbirlar: [${eventList}]
 
@@ -77,11 +79,12 @@ Qoidalar:
 - "action": olindi/chiqdi/ketdi/berildi => "TAKE"; qaytdi/qo'shildi/keldi/kirim/qaytarib ber => "ADD". Aniq bo'lmasa "TAKE".
 - BEKOR QILISH: "bekor qil"/"bekor qilindi"/"xato olindi"/"noto'g'ri olindi"/"ortga qaytar"/"qaytarib qo'y" — bu olingan narsani QAYTARISH, ya'ni action "ADD" (qoldiqни tiklaydi). Faqat aniq "kirimni/qo'shilganni bekor qil" desa => "TAKE".
 - "eventName": qaysi tadbir yoki kim uchun (masalan Impulse, Assodiq). Aytilmasa null.
+- "date": agar gapda sana aytilsa "YYYY-MM-DD" formatda qaytar, bugungi sanaga nisbatan hisobla: "kecha"=1 kun oldin, "ikki kun oldin"=2 kun oldin, "25-iyun"/"25 iyun"=shu yilning shu kuni, "1-iyul"=1-iyul. Sana aytilmasa null (bugun ishlatiladi).
 - "items": massiv; har biri {"itemName": "...", "quantity": raqam}. itemName ni yuqoridagi mahsulotlar ro'yxatiga IMKON QADAR moslashtir. quantity butun raqam (so'z bilan aytilsa raqamga: besh=5, o'n=10).
 - Bir nechta mahsulot aytilsa, hammasini items ga qo'sh.
 
 FAQAT JSON qaytar, boshqa hech qanday matn yozma:
-{"action":"TAKE","eventName":"Impulse","items":[{"itemName":"Stakan 25","quantity":5}]}
+{"action":"TAKE","eventName":"Impulse","date":null,"items":[{"itemName":"Stakan 25","quantity":5}]}
 Agar mazmun tushunarsiz bo'lsa: {"error":"Tushunarsiz"}`
 
     const client = new Anthropic({ apiKey: akey })

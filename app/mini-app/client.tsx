@@ -187,6 +187,7 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
   const applyVoice = (d: any) => {
     if (d.action === 'ADD' || d.action === 'TAKE') setActionType(d.action)
     if (d.eventName) setEventName(String(d.eventName))
+    if (typeof d.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) setSelectedDate(d.date)
     const newSel: SelectedItem[] = []
     for (const it of (d.items || [])) {
       const qty = Math.max(1, parseInt(String(it.quantity ?? 1), 10) || 1)
