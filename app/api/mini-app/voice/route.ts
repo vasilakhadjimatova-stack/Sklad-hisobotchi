@@ -18,9 +18,10 @@ async function transcribeOpenAI(audioB64: string, mimeType: string, key: string)
   const form = new FormData()
   form.append('file', new Blob([buf], { type: mimeType || 'audio/webm' }), `audio.${ext}`)
   form.append('model', 'gpt-4o-transcribe')
-  // DIQQAT: OpenAI 'uz' til kodini qabul qilmaydi. Avto-aniqlash + prompt bilan
-  // o'zbekchaga yo'naltiramiz (OpenAI tavsiyasi).
-  form.append('prompt', "O'zbek tilidagi ombor amali (chiqim yoki kirim). Masalan: Impulse tadbiriga besh dona stakan olindi, ikki pachka salfetka qaytdi.")
+  // DIQQAT: OpenAI 'uz' til kodini qabul qilmaydi. Avto-aniqlash + qisqa prompt
+  // bilan o'zbekchaga yo'naltiramiz. Aniq misol (mahsulot/miqdor) YOZMAYMIZ —
+  // aks holda jim/shovqinli audioda prompt takrorlanib soxta amal chiqadi.
+  form.append('prompt', "Bu o'zbek tilidagi ombor amali — chiqim, kirim yoki qaytarish.")
   const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}` },
