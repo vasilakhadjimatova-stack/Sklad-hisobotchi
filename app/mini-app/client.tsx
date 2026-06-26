@@ -621,6 +621,17 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
                 <p className="text-zinc-500 text-sm font-medium">Tadbir: <span className="text-brand-500 font-bold">{eventName}</span></p>
               </div>
 
+              <div className="flex items-center gap-3 bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl px-4 py-3">
+                <Calendar size={18} className="text-brand-500 shrink-0" />
+                <label className="text-sm font-bold text-zinc-600 shrink-0">Sana:</label>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="flex-1 bg-transparent text-zinc-900 font-bold text-base focus:outline-none"
+                />
+              </div>
+
               <div className="space-y-3">
                 {selected.map(s => (
                   <div key={s.item.id} className="bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl p-5 flex justify-between items-center">
