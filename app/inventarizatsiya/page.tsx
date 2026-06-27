@@ -49,7 +49,10 @@ export default async function InventarizatsiyaPage({
     where: { type: 'ADJUST', createdAt: { gte: start, lt: end } },
     orderBy: { createdAt: 'desc' },
     take: 300,
-    include: { item: { select: { name: true, unit: true } }, user: { select: { name: true } } },
+    include: {
+      item: { select: { name: true, unit: true, price: true, quantity: true } },
+      user: { select: { name: true } },
+    },
   })
   const adjustments = adjTxs
     .filter(t => t.item)
@@ -57,13 +60,18 @@ export default async function InventarizatsiyaPage({
       const d = new Date(t.createdAt.getTime() + 5 * 60 * 60 * 1000) // Toshkent
       const dd = String(d.getUTCDate()).padStart(2, '0')
       const mo = String(d.getUTCMonth() + 1).padStart(2, '0')
+      const hh = String(d.getUTCHours()).padStart(2, '0')
+      const mi = String(d.getUTCMinutes()).padStart(2, '0')
       return {
         id: t.id,
         name: t.item!.name,
         unit: t.item!.unit || 'dona',
         delta: t.quantity,
         date: `${dd}/${mo}/${d.getUTCFullYear()}`,
+        time: `${hh}:${mi}`,
         by: t.user?.name || '',
+        price: t.item!.price ?? 0,
+        qty: t.item!.quantity ?? 0,
       }
     })
 

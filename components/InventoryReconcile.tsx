@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Save, ClipboardCheck, AlertTriangle, Check, Filter, History, ChevronDown } from 'lucide-react'
+import { Search, Save, ClipboardCheck, AlertTriangle, Check, Filter, History, ChevronDown, X } from 'lucide-react'
 
 type Row = {
   id: string
@@ -21,10 +21,15 @@ type Adjustment = {
   unit: string
   delta: number
   date: string
+  time: string
   by: string
+  price: number
+  qty: number
 }
 
 const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr']
+
+const som = (n: number) => `${Math.round(n).toLocaleString('ru-RU')} so'm`
 
 export default function InventoryReconcile({ rows, month, adjustments }: { rows: Row[]; month: string; adjustments: Adjustment[] }) {
   const router = useRouter()
@@ -35,11 +40,19 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
   const [msg, setMsg] = useState('')
   const [corrected, setCorrected] = useState<any[]>([])
   const [histOpen, setHistOpen] = useState(true)
+  const [selected, setSelected] = useState<Adjustment | null>(null)
 
   const monthLabel = (() => {
     const [yy, mm] = month.split('-').map(Number)
     return `${UZ_MONTHS[(mm || 1) - 1] || ''} ${yy || ''}`.trim()
   })()
+
+  useEffect(() => {
+    if (!selected) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selected])
 
   const diffOf = (r: Row): number | null => {
     const v = counts[r.id]
@@ -211,15 +224,22 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
             <div className="px-5 pb-4 max-h-72 overflow-y-auto">
               <div className="space-y-1">
                 {adjustments.map(a => (
-                  <div key={a.id} className="flex justify-between items-center gap-3 text-sm border-b border-white/40 last:border-0 py-2">
+                  <button
+                    key={a.id}
+                    onClick={() => setSelected(a)}
+                    className="w-full flex justify-between items-center gap-3 text-sm border-b border-white/40 last:border-0 py-2 px-2 -mx-2 text-left rounded-lg hover:bg-white/50 transition-colors"
+                  >
                     <div className="min-w-0">
                       <div className="font-medium text-zinc-800 truncate">{a.name}</div>
                       <div className="text-xs text-zinc-400">{a.date}{a.by ? ` · ${a.by}` : ''}</div>
                     </div>
-                    <span className={`font-bold tabular-nums shrink-0 ${a.delta < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
-                      {a.delta > 0 ? '+' : ''}{a.delta} <span className="text-zinc-400 font-normal text-xs">{a.unit}</span>
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      <span className={`font-bold tabular-nums ${a.delta < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
+                        {a.delta > 0 ? '+' : ''}{a.delta} <span className="text-zinc-400 font-normal text-xs">{a.unit}</span>
+                      </span>
+                      <ChevronDown size={15} className="-rotate-90 text-zinc-300" />
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -290,6 +310,70 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
         Farq = haqiqiy − hisob. <span className="text-rose-500 font-medium">Manfiy (kam)</span> — hisobда ko'p ko'rsatilgan (chiqimi yozilmagan).
         <span className="text-amber-500 font-medium"> Musbat (ko'p)</span> — ortiqcha. "Tuzatish" qoldiqни haqiqiy songa moslaydi.
       </p>
+
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="glass-card border border-white/60 rounded-3xl p-6 w-full max-w-md shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-5">
+              <div className="min-w-0 pr-3">
+                <h3 className="text-lg font-bold text-zinc-900 leading-tight">{selected.name}</h3>
+                <p className="text-xs text-zinc-400 mt-1">
+                  {selected.date} {selected.time}{selected.by ? ` · ${selected.by}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelected(null)}
+                className="shrink-0 p-2 rounded-full hover:bg-white/60 text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+                <span className="text-sm text-zinc-500 font-medium">O'zgarish</span>
+                <span className={`font-bold tabular-nums ${selected.delta < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
+                  {selected.delta > 0 ? '+' : ''}{selected.delta} <span className="text-zinc-400 font-normal text-xs">{selected.unit}</span>
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+                <span className="text-sm text-zinc-500 font-medium">Birlik narxi</span>
+                <span className="font-bold tabular-nums text-zinc-800">
+                  {selected.price > 0 ? som(selected.price) : <span className="text-zinc-400 font-normal text-sm">narx kiritilmagan</span>}
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-3 px-3.5 rounded-xl bg-gradient-to-r from-brand-500/10 to-violet-500/10 border border-brand-500/20">
+                <span className="text-sm text-zinc-600 font-semibold">O'zgarish qiymati</span>
+                <span className={`font-extrabold tabular-nums ${selected.delta < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>
+                  {selected.delta > 0 ? '+' : ''}{som(selected.delta * selected.price)}
+                </span>
+              </div>
+
+              <div className="h-px bg-white/60 my-1" />
+
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+                <span className="text-sm text-zinc-500 font-medium">Hozirgi qoldiq</span>
+                <span className="font-bold tabular-nums text-zinc-800">
+                  {selected.qty} <span className="text-zinc-400 font-normal text-xs">{selected.unit}</span>
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+                <span className="text-sm text-zinc-500 font-medium">Qoldiq qiymati</span>
+                <span className="font-bold tabular-nums text-zinc-800">{som(selected.qty * selected.price)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
