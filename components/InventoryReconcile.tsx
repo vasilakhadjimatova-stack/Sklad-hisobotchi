@@ -74,6 +74,13 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
     return { counted, mismatch, net }
   }, [counts, rows])
 
+  // O'tgan tuzatishlar xulosasi (shu oy) — sahifa bo'sh ko'rinmasligi uchun
+  const adjSummary = useMemo(() => {
+    let net = 0, value = 0
+    for (const a of adjustments) { net += a.delta; value += a.delta * a.price }
+    return { count: adjustments.length, net, value, last: adjustments[0] || null }
+  }, [adjustments])
+
   const visible = rows.filter(r => {
     if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false
     if (onlyMismatch) { const d = diffOf(r); return d !== null && d !== 0 }
@@ -152,6 +159,21 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
           </h3>
         </div>
       </div>
+
+      {/* O'tgan tuzatishlar xulosasi (shu oy) */}
+      {adjustments.length > 0 && (
+        <div className="-mt-4 mb-8 glass-card border border-brand-500/20 rounded-2xl px-5 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
+          <span className="flex items-center gap-2 font-bold text-zinc-700">
+            <History size={16} className="text-brand-500" /> {monthLabel}da tuzatildi
+          </span>
+          <span className="text-zinc-500">Mahsulot: <b className="text-zinc-900 tabular-nums">{adjSummary.count}</b></span>
+          <span className="text-zinc-500">Jami o'zgarish: <b className={`tabular-nums ${adjSummary.net < 0 ? 'text-rose-500' : adjSummary.net > 0 ? 'text-amber-500' : 'text-zinc-900'}`}>{adjSummary.net > 0 ? '+' : ''}{adjSummary.net}</b></span>
+          <span className="text-zinc-500">Qiymat: <b className={`tabular-nums ${adjSummary.value < 0 ? 'text-rose-500' : adjSummary.value > 0 ? 'text-emerald-600' : 'text-zinc-900'}`}>{adjSummary.value > 0 ? '+' : ''}{som(adjSummary.value)}</b></span>
+          {adjSummary.last && (
+            <span className="text-zinc-400 md:ml-auto">oxirgisi: {adjSummary.last.date} {adjSummary.last.time}</span>
+          )}
+        </div>
+      )}
 
       {/* Boshqaruv */}
       <div className="flex flex-col md:flex-row gap-3 mb-5 items-stretch md:items-center">
