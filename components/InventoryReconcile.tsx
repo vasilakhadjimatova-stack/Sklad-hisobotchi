@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Save, ClipboardCheck, AlertTriangle, Check, Filter } from 'lucide-react'
+import { Search, Save, ClipboardCheck, AlertTriangle, Check, Filter, History, ChevronDown } from 'lucide-react'
 
 type Row = {
   id: string
@@ -15,7 +15,18 @@ type Row = {
   added: number
 }
 
-export default function InventoryReconcile({ rows, month }: { rows: Row[]; month: string }) {
+type Adjustment = {
+  id: string
+  name: string
+  unit: string
+  delta: number
+  date: string
+  by: string
+}
+
+const UZ_MONTHS = ['Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'Iyun', 'Iyul', 'Avgust', 'Sentabr', 'Oktabr', 'Noyabr', 'Dekabr']
+
+export default function InventoryReconcile({ rows, month, adjustments }: { rows: Row[]; month: string; adjustments: Adjustment[] }) {
   const router = useRouter()
   const [counts, setCounts] = useState<Record<string, string>>({})
   const [search, setSearch] = useState('')
@@ -23,6 +34,12 @@ export default function InventoryReconcile({ rows, month }: { rows: Row[]; month
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [corrected, setCorrected] = useState<any[]>([])
+  const [histOpen, setHistOpen] = useState(true)
+
+  const monthLabel = (() => {
+    const [yy, mm] = month.split('-').map(Number)
+    return `${UZ_MONTHS[(mm || 1) - 1] || ''} ${yy || ''}`.trim()
+  })()
 
   const diffOf = (r: Row): number | null => {
     const v = counts[r.id]
@@ -157,7 +174,7 @@ export default function InventoryReconcile({ rows, month }: { rows: Row[]; month
         <div className="mb-5 glass-card border border-emerald-500/30 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="font-bold text-emerald-600 text-sm flex items-center gap-2">
-              <Check size={16} /> Tuzatilgan mahsulotlar ({corrected.length})
+              <Check size={16} /> Hozir tuzatildi ({corrected.length})
             </div>
             <button onClick={() => setCorrected([])} className="text-xs text-zinc-400 hover:text-zinc-600 font-medium">yashirish</button>
           </div>
@@ -176,6 +193,37 @@ export default function InventoryReconcile({ rows, month }: { rows: Row[]; month
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {adjustments.length > 0 && (
+        <div className="mb-5 glass-card border border-white/60 rounded-2xl overflow-hidden">
+          <button
+            onClick={() => setHistOpen(o => !o)}
+            className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-white/40 transition-colors"
+          >
+            <div className="font-bold text-zinc-700 text-sm flex items-center gap-2">
+              <History size={16} className="text-brand-500" /> Tuzatishlar tarixi · {monthLabel} ({adjustments.length})
+            </div>
+            <ChevronDown size={18} className={`text-zinc-400 transition-transform ${histOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {histOpen && (
+            <div className="px-5 pb-4 max-h-72 overflow-y-auto">
+              <div className="space-y-1">
+                {adjustments.map(a => (
+                  <div key={a.id} className="flex justify-between items-center gap-3 text-sm border-b border-white/40 last:border-0 py-2">
+                    <div className="min-w-0">
+                      <div className="font-medium text-zinc-800 truncate">{a.name}</div>
+                      <div className="text-xs text-zinc-400">{a.date}{a.by ? ` · ${a.by}` : ''}</div>
+                    </div>
+                    <span className={`font-bold tabular-nums shrink-0 ${a.delta < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
+                      {a.delta > 0 ? '+' : ''}{a.delta} <span className="text-zinc-400 font-normal text-xs">{a.unit}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

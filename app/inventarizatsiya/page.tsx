@@ -44,5 +44,28 @@ export default async function InventarizatsiyaPage({
     added: inMap[i.id] || 0,
   }))
 
-  return <InventoryReconcile rows={rows} month={month} />
+  // Shu oyda qilingan tuzatishlar (ADJUST) — tarix sifatida ko'rsatish uchun
+  const adjTxs = await prisma.transaction.findMany({
+    where: { type: 'ADJUST', createdAt: { gte: start, lt: end } },
+    orderBy: { createdAt: 'desc' },
+    take: 300,
+    include: { item: { select: { name: true, unit: true } }, user: { select: { name: true } } },
+  })
+  const adjustments = adjTxs
+    .filter(t => t.item)
+    .map(t => {
+      const d = new Date(t.createdAt.getTime() + 5 * 60 * 60 * 1000) // Toshkent
+      const dd = String(d.getUTCDate()).padStart(2, '0')
+      const mo = String(d.getUTCMonth() + 1).padStart(2, '0')
+      return {
+        id: t.id,
+        name: t.item!.name,
+        unit: t.item!.unit || 'dona',
+        delta: t.quantity,
+        date: `${dd}/${mo}/${d.getUTCFullYear()}`,
+        by: t.user?.name || '',
+      }
+    })
+
+  return <InventoryReconcile rows={rows} month={month} adjustments={adjustments} />
 }
