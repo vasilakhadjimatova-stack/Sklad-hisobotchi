@@ -41,6 +41,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
   const [corrected, setCorrected] = useState<any[]>([])
   const [histOpen, setHistOpen] = useState(true)
   const [selected, setSelected] = useState<Adjustment | null>(null)
+  const [summaryOpen, setSummaryOpen] = useState(false)
 
   const monthLabel = (() => {
     const [yy, mm] = month.split('-').map(Number)
@@ -48,11 +49,11 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
   })()
 
   useEffect(() => {
-    if (!selected) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelected(null) }
+    if (!selected && !summaryOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setSelected(null); setSummaryOpen(false) } }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selected])
+  }, [selected, summaryOpen])
 
   const diffOf = (r: Row): number | null => {
     const v = counts[r.id]
@@ -80,6 +81,12 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
     for (const a of adjustments) { net += a.delta; value += a.delta * a.price }
     return { count: adjustments.length, net, value, last: adjustments[0] || null }
   }, [adjustments])
+
+  // Modal uchun: qiymat (delta×narx) bo'yicha eng kattadan saralangan
+  const adjByImpact = useMemo(
+    () => [...adjustments].sort((a, b) => Math.abs(b.delta * b.price) - Math.abs(a.delta * a.price)),
+    [adjustments]
+  )
 
   const visible = rows.filter(r => {
     if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false
@@ -160,9 +167,12 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
         </div>
       </div>
 
-      {/* O'tgan tuzatishlar xulosasi (shu oy) */}
+      {/* O'tgan tuzatishlar xulosasi (shu oy) — bosilsa batafsil modal */}
       {adjustments.length > 0 && (
-        <div className="-mt-4 mb-8 glass-card border border-brand-500/20 rounded-2xl px-5 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
+        <button
+          onClick={() => setSummaryOpen(true)}
+          className="-mt-4 mb-8 w-full text-left glass-card border border-brand-500/20 rounded-2xl px-5 py-3.5 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm hover:border-brand-500/40 hover:bg-white/40 transition-colors"
+        >
           <span className="flex items-center gap-2 font-bold text-zinc-700">
             <History size={16} className="text-brand-500" /> {monthLabel}da tuzatildi
           </span>
@@ -170,9 +180,12 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
           <span className="text-zinc-500">Jami o'zgarish: <b className={`tabular-nums ${adjSummary.net < 0 ? 'text-rose-500' : adjSummary.net > 0 ? 'text-amber-500' : 'text-zinc-900'}`}>{adjSummary.net > 0 ? '+' : ''}{adjSummary.net}</b></span>
           <span className="text-zinc-500">Qiymat: <b className={`tabular-nums ${adjSummary.value < 0 ? 'text-rose-500' : adjSummary.value > 0 ? 'text-emerald-600' : 'text-zinc-900'}`}>{adjSummary.value > 0 ? '+' : ''}{som(adjSummary.value)}</b></span>
           {adjSummary.last && (
-            <span className="text-zinc-400 md:ml-auto">oxirgisi: {adjSummary.last.date} {adjSummary.last.time}</span>
+            <span className="text-zinc-400">oxirgisi: {adjSummary.last.date} {adjSummary.last.time}</span>
           )}
-        </div>
+          <span className="md:ml-auto flex items-center gap-1 text-brand-600 font-semibold shrink-0">
+            Batafsil <ChevronDown size={15} className="-rotate-90" />
+          </span>
+        </button>
       )}
 
       {/* Boshqaruv */}
@@ -392,6 +405,81 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
                 <span className="text-sm text-zinc-500 font-medium">Qoldiq qiymati</span>
                 <span className="font-bold tabular-nums text-zinc-800">{som(selected.qty * selected.price)}</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {summaryOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 backdrop-blur-sm"
+          onClick={() => setSummaryOpen(false)}
+        >
+          <div
+            className="glass-card border border-white/60 rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[88vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between p-6 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-zinc-900">{monthLabel} — tuzatishlar</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">Inventarizatsiya natijasida o'zgargan mahsulotlar (eng kattadan)</p>
+              </div>
+              <button
+                onClick={() => setSummaryOpen(false)}
+                className="shrink-0 p-2 rounded-full hover:bg-white/60 text-zinc-400 hover:text-zinc-700 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 px-6 pb-4">
+              <div className="rounded-xl bg-white/50 p-3 text-center">
+                <p className="text-xs text-zinc-500 mb-0.5">Mahsulot</p>
+                <p className="text-xl font-bold text-zinc-900 tabular-nums">{adjSummary.count}</p>
+              </div>
+              <div className="rounded-xl bg-white/50 p-3 text-center">
+                <p className="text-xs text-zinc-500 mb-0.5">Jami o'zgarish</p>
+                <p className={`text-xl font-bold tabular-nums ${adjSummary.net < 0 ? 'text-rose-500' : adjSummary.net > 0 ? 'text-amber-500' : 'text-zinc-900'}`}>{adjSummary.net > 0 ? '+' : ''}{adjSummary.net}</p>
+              </div>
+              <div className="rounded-xl bg-white/50 p-3 text-center">
+                <p className="text-xs text-zinc-500 mb-0.5">Qiymat</p>
+                <p className={`text-base font-bold tabular-nums ${adjSummary.value < 0 ? 'text-rose-500' : adjSummary.value > 0 ? 'text-emerald-600' : 'text-zinc-900'}`}>{adjSummary.value > 0 ? '+' : ''}{som(adjSummary.value)}</p>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto px-6 pb-6">
+              <table className="w-full text-sm border-collapse">
+                <thead className="sticky top-0 bg-white/85 backdrop-blur-md">
+                  <tr className="text-xs text-zinc-400 uppercase tracking-wider">
+                    <th className="py-2 pr-2 font-medium text-left">Mahsulot</th>
+                    <th className="py-2 px-2 font-medium text-right">O'zgarish</th>
+                    <th className="py-2 px-2 font-medium text-right">Narx</th>
+                    <th className="py-2 pl-2 font-medium text-right">Qiymat</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/50">
+                  {adjByImpact.map(a => {
+                    const val = a.delta * a.price
+                    return (
+                      <tr key={a.id}>
+                        <td className="py-2.5 pr-2 align-top">
+                          <div className="font-medium text-zinc-800 leading-tight">{a.name}</div>
+                          <div className="text-xs text-zinc-400">{a.date}{a.by ? ` · ${a.by}` : ''}</div>
+                        </td>
+                        <td className={`py-2.5 px-2 text-right font-bold tabular-nums whitespace-nowrap ${a.delta < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
+                          {a.delta > 0 ? '+' : ''}{a.delta} <span className="text-zinc-400 font-normal text-xs">{a.unit}</span>
+                        </td>
+                        <td className="py-2.5 px-2 text-right tabular-nums text-zinc-500 whitespace-nowrap">
+                          {a.price > 0 ? som(a.price) : '—'}
+                        </td>
+                        <td className={`py-2.5 pl-2 text-right font-bold tabular-nums whitespace-nowrap ${val < 0 ? 'text-rose-500' : val > 0 ? 'text-emerald-600' : 'text-zinc-300'}`}>
+                          {val > 0 ? '+' : ''}{som(val)}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
