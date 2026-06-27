@@ -22,6 +22,7 @@ export default function InventoryReconcile({ rows, month }: { rows: Row[]; month
   const [onlyMismatch, setOnlyMismatch] = useState(false)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [corrected, setCorrected] = useState<any[]>([])
 
   const diffOf = (r: Row): number | null => {
     const v = counts[r.id]
@@ -68,7 +69,8 @@ export default function InventoryReconcile({ rows, month }: { rows: Row[]; month
       })
       const d = await res.json()
       if (d.success) {
-        setMsg(`✓ ${d.changed} ta mahsulot qoldig'i to'g'rilandi.`)
+        setMsg('')
+        setCorrected(Array.isArray(d.details) ? d.details : [])
         setCounts({})
         router.refresh()
       } else setMsg(d.error || 'Xato')
@@ -149,6 +151,32 @@ export default function InventoryReconcile({ rows, month }: { rows: Row[]; month
 
       {msg && (
         <div className="mb-4 text-sm font-medium text-zinc-700 glass-card border border-white/60 rounded-xl px-4 py-3">{msg}</div>
+      )}
+
+      {corrected.length > 0 && (
+        <div className="mb-5 glass-card border border-emerald-500/30 rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="font-bold text-emerald-600 text-sm flex items-center gap-2">
+              <Check size={16} /> Tuzatilgan mahsulotlar ({corrected.length})
+            </div>
+            <button onClick={() => setCorrected([])} className="text-xs text-zinc-400 hover:text-zinc-600 font-medium">yashirish</button>
+          </div>
+          <div className="space-y-1.5">
+            {corrected.map((c, i) => (
+              <div key={i} className="flex justify-between items-center text-sm border-b border-white/40 last:border-0 pb-1.5 last:pb-0">
+                <span className="font-medium text-zinc-800 truncate pr-3">{c.name}</span>
+                <span className="tabular-nums shrink-0">
+                  <span className="text-zinc-400">{c.old}</span>
+                  <span className="mx-1.5 text-zinc-300">→</span>
+                  <span className="font-bold text-zinc-900">{c.new}</span>
+                  <span className={`ml-2 font-bold ${c.delta < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
+                    ({c.delta > 0 ? '+' : ''}{c.delta})
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Jadval */}
