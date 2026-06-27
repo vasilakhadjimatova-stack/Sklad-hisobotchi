@@ -352,7 +352,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
           onClick={() => setSelected(null)}
         >
           <div
-            className="glass-card border border-white/60 rounded-3xl p-6 w-full max-w-md shadow-2xl"
+            className="bg-white border border-zinc-100 rounded-3xl p-6 w-full max-w-md shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-5">
@@ -364,21 +364,21 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
               </div>
               <button
                 onClick={() => setSelected(null)}
-                className="shrink-0 p-2 rounded-full hover:bg-white/60 text-zinc-400 hover:text-zinc-700 transition-colors"
+                className="shrink-0 p-2 rounded-full hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-zinc-50">
                 <span className="text-sm text-zinc-500 font-medium">O'zgarish</span>
                 <span className={`font-bold tabular-nums ${selected.delta < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
                   {selected.delta > 0 ? '+' : ''}{selected.delta} <span className="text-zinc-400 font-normal text-xs">{selected.unit}</span>
                 </span>
               </div>
 
-              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-zinc-50">
                 <span className="text-sm text-zinc-500 font-medium">Birlik narxi</span>
                 <span className="font-bold tabular-nums text-zinc-800">
                   {selected.price > 0 ? som(selected.price) : <span className="text-zinc-400 font-normal text-sm">narx kiritilmagan</span>}
@@ -392,16 +392,16 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
                 </span>
               </div>
 
-              <div className="h-px bg-white/60 my-1" />
+              <div className="h-px bg-zinc-100 my-1" />
 
-              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-zinc-50">
                 <span className="text-sm text-zinc-500 font-medium">Hozirgi qoldiq</span>
                 <span className="font-bold tabular-nums text-zinc-800">
                   {selected.qty} <span className="text-zinc-400 font-normal text-xs">{selected.unit}</span>
                 </span>
               </div>
 
-              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-white/50">
+              <div className="flex justify-between items-center py-2.5 px-3.5 rounded-xl bg-zinc-50">
                 <span className="text-sm text-zinc-500 font-medium">Qoldiq qiymati</span>
                 <span className="font-bold tabular-nums text-zinc-800">{som(selected.qty * selected.price)}</span>
               </div>
@@ -416,7 +416,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
           onClick={() => setSummaryOpen(false)}
         >
           <div
-            className="glass-card border border-white/60 rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[88vh]"
+            className="bg-white border border-zinc-100 rounded-3xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[88vh]"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between p-6 pb-4">
@@ -426,22 +426,22 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
               </div>
               <button
                 onClick={() => setSummaryOpen(false)}
-                className="shrink-0 p-2 rounded-full hover:bg-white/60 text-zinc-400 hover:text-zinc-700 transition-colors"
+                className="shrink-0 p-2 rounded-full hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors"
               >
                 <X size={18} />
               </button>
             </div>
 
             <div className="grid grid-cols-3 gap-3 px-6 pb-4">
-              <div className="rounded-xl bg-white/50 p-3 text-center">
+              <div className="rounded-xl bg-zinc-50 p-3 text-center">
                 <p className="text-xs text-zinc-500 mb-0.5">Mahsulot</p>
                 <p className="text-xl font-bold text-zinc-900 tabular-nums">{adjSummary.count}</p>
               </div>
-              <div className="rounded-xl bg-white/50 p-3 text-center">
+              <div className="rounded-xl bg-zinc-50 p-3 text-center">
                 <p className="text-xs text-zinc-500 mb-0.5">Jami o'zgarish</p>
                 <p className={`text-xl font-bold tabular-nums ${adjSummary.net < 0 ? 'text-rose-500' : adjSummary.net > 0 ? 'text-amber-500' : 'text-zinc-900'}`}>{adjSummary.net > 0 ? '+' : ''}{adjSummary.net}</p>
               </div>
-              <div className="rounded-xl bg-white/50 p-3 text-center">
+              <div className="rounded-xl bg-zinc-50 p-3 text-center">
                 <p className="text-xs text-zinc-500 mb-0.5">Qiymat</p>
                 <p className={`text-base font-bold tabular-nums ${adjSummary.value < 0 ? 'text-rose-500' : adjSummary.value > 0 ? 'text-emerald-600' : 'text-zinc-900'}`}>{adjSummary.value > 0 ? '+' : ''}{som(adjSummary.value)}</p>
               </div>
@@ -449,7 +449,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
 
             <div className="overflow-y-auto px-6 pb-6">
               <table className="w-full text-sm border-collapse">
-                <thead className="sticky top-0 bg-white/85 backdrop-blur-md">
+                <thead className="sticky top-0 bg-white">
                   <tr className="text-xs text-zinc-400 uppercase tracking-wider">
                     <th className="py-2 pr-2 font-medium text-left">Mahsulot</th>
                     <th className="py-2 px-2 font-medium text-right">O'zgarish</th>
@@ -457,7 +457,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
                     <th className="py-2 pl-2 font-medium text-right">Qiymat</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/50">
+                <tbody className="divide-y divide-zinc-100">
                   {adjByImpact.map(a => {
                     const val = a.delta * a.price
                     return (
