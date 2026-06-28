@@ -10,7 +10,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sanoq kiritilmagan" }, { status: 200 })
     }
 
-    const actor = (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))
+    // Actor: haqiqiy sayt admini ('system' = "Eski Tizim (Google Sheets)" import hisobini chetlab o'tamiz)
+    const actor = (await prisma.user.findFirst({ where: { role: 'ADMIN', NOT: { telegramId: 'system' } } }))
+      || (await prisma.user.findFirst({ where: { role: 'ADMIN' } }))
       || (await prisma.user.findFirst())
     const actorId = actor?.id || null
 
