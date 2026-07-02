@@ -186,6 +186,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   // Kirim (ADD): miqdor + kelgan narx
   const [addQtyField, setAddQtyField] = useState('')
   const [addPriceField, setAddPriceField] = useState('')
+  const [addPriceMode, setAddPriceMode] = useState<'piece' | 'pack'>('piece')
   // Yangi mahsulot: narx qiymati + narx birligi (dona yoki pachka)
   const [newPriceField, setNewPriceField] = useState('')
   const [newPriceMode, setNewPriceMode] = useState<'piece' | 'pack'>('piece')
@@ -200,6 +201,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     setQtyPieceField('')
     setAddQtyField('')
     setAddPriceField('')
+    setAddPriceMode('piece')
     setNewPriceField('')
     setNewPriceMode('piece')
   }
@@ -285,11 +287,17 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
 
   // Kirim (ADD): tortilgan o'rtacha narx preview
   const addQtyNum = Math.max(0, Math.floor(Number(addQtyField) || 0))
-  const addPriceNum = Math.max(0, Number(addPriceField) || 0)
+  const addPriceRaw = Math.max(0, Number(addPriceField) || 0)
+  const addPackSize = Math.max(1, Math.floor(Number(selectedItem?.packSize ?? 1)))
+  const addHasPack = addPackSize > 1
+  // Kelgan narx dona yoki pachkada — 1 dona narxiga o'giriladi
+  const addPricePerDona = (addPriceMode === 'pack' && addHasPack)
+    ? Math.round((addPriceRaw / addPackSize) * 100) / 100
+    : addPriceRaw
   const curStockQty = Math.max(0, Number(selectedItem?.quantity ?? 0))
   const curStockPrice = Math.max(0, Number(selectedItem?.price ?? 0))
-  const newAvgPrice = addPriceNum > 0
-    ? (curStockQty > 0 ? (curStockQty * curStockPrice + addQtyNum * addPriceNum) / (curStockQty + addQtyNum) : addPriceNum)
+  const newAvgPrice = addPricePerDona > 0
+    ? (curStockQty > 0 ? (curStockQty * curStockPrice + addQtyNum * addPricePerDona) / (curStockQty + addQtyNum) : addPricePerDona)
     : curStockPrice
   const fmtSom = (n: number) => Math.round(n).toLocaleString('ru-RU')
 
@@ -521,26 +529,54 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                   className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
                 />
               </div>
-              <div className="w-full sm:w-44">
-                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Kelgan narx — 1 {selectedItem?.unit || 'dona'} (so'm)</label>
-                <input
-                  name="price"
-                  type="number"
-                  min="0"
-                  value={addPriceField}
-                  onChange={(e) => setAddPriceField(e.target.value)}
-                  placeholder="ixtiyoriy"
-                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
-                />
+              <div className="w-full sm:w-56">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
+                  Kelgan narx — 1 {addPriceMode === 'pack' && addHasPack ? (selectedItem?.packUnit || 'pachka') : (selectedItem?.unit || 'dona')} (so'm)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={addPriceField}
+                    onChange={(e) => setAddPriceField(e.target.value)}
+                    placeholder="ixtiyoriy"
+                    className="flex-1 w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
+                  />
+                  {addHasPack && (
+                    <div className="flex rounded-xl border border-white/60 overflow-hidden shrink-0 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => setAddPriceMode('piece')}
+                        className={`px-3 text-xs font-bold transition-colors ${addPriceMode === 'piece' ? 'bg-amber-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}
+                      >
+                        {selectedItem?.unit || 'dona'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAddPriceMode('pack')}
+                        className={`px-3 text-xs font-bold transition-colors ${addPriceMode === 'pack' ? 'bg-amber-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}
+                      >
+                        {selectedItem?.packUnit || 'pachka'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {/* Server har doim 1 dona narxini oladi */}
+                <input type="hidden" name="price" value={String(addPricePerDona)} readOnly />
+                {addHasPack && addPriceMode === 'pack' && addPriceRaw > 0 && (
+                  <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">
+                    = {fmtSom(addPricePerDona)} so'm / {selectedItem?.unit || 'dona'} · (1 {selectedItem?.packUnit || 'pachka'} = {addPackSize} {selectedItem?.unit || 'dona'})
+                  </p>
+                )}
               </div>
             </div>
 
-            {selectedItem && addQtyNum > 0 && addPriceNum > 0 && (
+            {selectedItem && addQtyNum > 0 && addPriceRaw > 0 && (
               <div className="px-5 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-zinc-900/70">
                   <span>Hozirgi: <b className="text-zinc-900">{curStockQty}</b> × {fmtSom(curStockPrice)} so'm</span>
                   <span className="text-zinc-900/30">+</span>
-                  <span>keldi: <b className="text-zinc-900">{addQtyNum}</b> × {fmtSom(addPriceNum)} so'm</span>
+                  <span>keldi: <b className="text-zinc-900">{addQtyNum}</b> × {fmtSom(addPricePerDona)} so'm</span>
                   <span className="text-zinc-900/30">→</span>
                   <span className="font-bold text-emerald-700">yangi o'rtacha: {fmtSom(newAvgPrice)} so'm</span>
                   <span className="text-zinc-900/40">· yangi qoldiq {curStockQty + addQtyNum} {selectedItem.unit || 'dona'}</span>
@@ -550,7 +586,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
 
             <p className="text-xs text-zinc-900/40 font-medium -mt-1">
               <b>Kelgan narx</b> kiritilsa — tizim <b>tortilgan o'rtacha narx</b>ni avtomatik hisoblaydi (eski qoldiq + yangi partiya). Bo'sh qoldirsangiz eski narx saqlanadi.
-              {selectedItem && (selectedItem.packSize ?? 1) > 1 ? ` Bu mahsulot pachkali (1 ${selectedItem.packUnit || 'pachka'} = ${selectedItem.packSize} ${selectedItem.unit || 'dona'}) — narxni 1 ${selectedItem.unit || 'dona'}ga hisoblab kiriting.` : ''}
+              {addHasPack ? ' Narxni dona yoki pachka hisobida kiritishingiz mumkin — yonidagi tugmadan tanlang.' : ''}
             </p>
           </>
         )}
