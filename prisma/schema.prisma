@@ -24,6 +24,8 @@ model Item {
   unit         String        @default("Dona") // bazaviy (dona) birlik nomi
   packSize     Int           @default(1)   // 1 pachkada nechta dona (1 = pachka yo'q)
   packUnit     String        @default("pachka") // pachka birligi nomi
+  boxSize      Int           @default(1)   // 1 katta pachkada nechta pachka (1 = katta pachka yo'q)
+  boxUnit      String        @default("karobka") // katta pachka birligi nomi
   transactions Transaction[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

@@ -19,12 +19,15 @@ export async function createNewItem(formData: FormData) {
   const unit = formData.get('unit')?.toString()?.trim() || 'Dona'
   const packUnit = formData.get('packUnit')?.toString()?.trim() || 'pachka'
   const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
+  const boxUnit = formData.get('boxUnit')?.toString()?.trim() || 'karobka'
+  const boxSize = Math.max(1, Math.floor(Number(formData.get('boxSize')) || 1))
   const price = Math.max(0, Number(formData.get('price')) || 0) // 1 bazaviy birlik (dona) narxi
 
-  // Boshlang'ich miqdor pachka va/yoki donada kiritiladi — bazaviy donaga aylantiriladi
+  // Boshlang'ich miqdor katta pachka / pachka / donada kiritiladi — bazaviy donaga aylantiriladi
+  const qtyBox = Math.max(0, Math.floor(Number(formData.get('qtyBox')) || 0))
   const qtyPack = Math.max(0, Math.floor(Number(formData.get('qtyPack')) || 0))
   const qtyPiece = Math.max(0, Math.floor(Number(formData.get('qtyPiece')) || 0))
-  const quantity = qtyPack * packSize + qtyPiece
+  const quantity = qtyBox * boxSize * packSize + qtyPack * packSize + qtyPiece
 
   if (!name || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri (Soni 0 dan katta bo'lishi kerak)" }
 
@@ -35,7 +38,7 @@ export async function createNewItem(formData: FormData) {
     const admin = await getAdminUser()
 
     const item = await prisma.item.create({
-      data: { name, quantity, unit, packUnit, packSize, price }
+      data: { name, quantity, unit, packUnit, packSize, boxUnit, boxSize, price }
     })
 
     await prisma.transaction.create({
@@ -118,6 +121,8 @@ export async function setItemUnit(formData: FormData) {
   const unit = formData.get('unit')?.toString()?.trim() || 'Dona'
   const packUnit = formData.get('packUnit')?.toString()?.trim() || 'pachka'
   const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
+  const boxUnit = formData.get('boxUnit')?.toString()?.trim() || 'karobka'
+  const boxSize = Math.max(1, Math.floor(Number(formData.get('boxSize')) || 1))
 
   if (!itemId) return { error: "Mahsulot tanlanmadi" }
   if (!name) return { error: "Nom bo'sh bo'lishi mumkin emas" }
@@ -134,7 +139,7 @@ export async function setItemUnit(formData: FormData) {
       }
     }
 
-    const data: any = { name, unit, packUnit, packSize }
+    const data: any = { name, unit, packUnit, packSize, boxUnit, boxSize }
 
     // Narx — faqat to'g'ri qiymat (bo'sh emas, son) kelganda yangilanadi
     const priceRaw = formData.get('price')

@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react'
 import { createNewItem, addStock, setItemUnit } from '@/app/actions'
 import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2 } from 'lucide-react'
 
-type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number, quantity?: number }
+type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number, quantity?: number, boxUnit?: string, boxSize?: number }
 
 // O'yin uslubidagi chiroyli ranglar
 const gradientColors = [
@@ -183,23 +183,32 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   // Yangi mahsulot boshlang'ich miqdori (pachka + dona)
   const [qtyPackField, setQtyPackField] = useState('')
   const [qtyPieceField, setQtyPieceField] = useState('')
-  // Kirim (ADD): miqdor + kelgan narx
+  // Katta pachka (3-pog'ona) sozlamasi — NEW/UNIT tab
+  const [boxSizeField, setBoxSizeField] = useState('1')
+  const [boxUnitField, setBoxUnitField] = useState('karobka')
+  // Kirim (ADD): miqdor + kelgan narx (har biri o'z birlik rejimi bilan)
   const [addQtyField, setAddQtyField] = useState('')
+  const [addQtyMode, setAddQtyMode] = useState<'piece' | 'pack' | 'box'>('piece')
   const [addPriceField, setAddPriceField] = useState('')
-  const [addPriceMode, setAddPriceMode] = useState<'piece' | 'pack'>('piece')
-  // Yangi mahsulot: narx qiymati + narx birligi (dona yoki pachka)
+  const [addPriceMode, setAddPriceMode] = useState<'piece' | 'pack' | 'box'>('piece')
+  // Yangi mahsulot: narx + boshlang'ich miqdor (katta pachka)
+  const [qtyBoxField, setQtyBoxField] = useState('')
   const [newPriceField, setNewPriceField] = useState('')
-  const [newPriceMode, setNewPriceMode] = useState<'piece' | 'pack'>('piece')
+  const [newPriceMode, setNewPriceMode] = useState<'piece' | 'pack' | 'box'>('piece')
 
   const resetUnitFields = () => {
     setNameField('')
     setUnitField('dona')
     setPackUnitField('pachka')
     setPackSizeField('1')
+    setBoxUnitField('karobka')
+    setBoxSizeField('1')
     setPriceField('')
     setQtyPackField('')
     setQtyPieceField('')
+    setQtyBoxField('')
     setAddQtyField('')
+    setAddQtyMode('piece')
     setAddPriceField('')
     setAddPriceMode('piece')
     setNewPriceField('')
@@ -222,6 +231,8 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
       setUnitField(item.unit || 'dona')
       setPackUnitField(item.packUnit || 'pachka')
       setPackSizeField(String(item.packSize ?? 1))
+      setBoxUnitField(item.boxUnit || 'karobka')
+      setBoxSizeField(String(item.boxSize ?? 1))
       setPriceField(item.price != null ? String(item.price) : '')
     } else {
       resetUnitFields()
@@ -238,10 +249,12 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     // Yangi mahsulot: pachka + dona dan kamida biri kiritilgan bo'lsin
     if (activeTab === 'NEW') {
       const ps = Math.max(1, Math.floor(Number(packSizeField) || 1))
-      // Pachka maydoni faqat packSize > 1 bo'lganda ko'rinadi/yuboriladi (server bilan mos)
+      const bs = Math.max(1, Math.floor(Number(boxSizeField) || 1))
+      // Pachka/katta pachka maydonlari faqat mos daraja bo'lganda hisobga olinadi
       const pk = ps > 1 ? Math.max(0, Math.floor(Number(qtyPackField) || 0)) : 0
+      const bx = (ps > 1 && bs > 1) ? Math.max(0, Math.floor(Number(qtyBoxField) || 0)) : 0
       const pc = Math.max(0, Math.floor(Number(qtyPieceField) || 0))
-      if (pk * ps + pc <= 0) {
+      if (bx * bs * ps + pk * ps + pc <= 0) {
         setMsg("Boshlang'ich miqdorni kiriting (0 dan katta bo'lsin)")
         setIsError(true)
         return
@@ -279,33 +292,51 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
 
   const packSizeNum = Math.max(1, Math.floor(Number(packSizeField) || 1))
   const hasPack = packSizeNum > 1
+  // Katta pachka (3-pog'ona)
+  const boxSizeNum = Math.max(1, Math.floor(Number(boxSizeField) || 1))
+  const hasBox = hasPack && boxSizeNum > 1
+  const donaPerBox = packSizeNum * boxSizeNum   // 1 katta pachka = nechta dona
 
-  // Yangi mahsulot boshlang'ich miqdori — pachka + dona → bazaviy dona
+  // Yangi mahsulot boshlang'ich miqdori — katta pachka + pachka + dona → bazaviy dona
+  const qtyBoxNum = Math.max(0, Math.floor(Number(qtyBoxField) || 0))
   const qtyPackNum = Math.max(0, Math.floor(Number(qtyPackField) || 0))
   const qtyPieceNum = Math.max(0, Math.floor(Number(qtyPieceField) || 0))
-  const totalBaseQty = qtyPackNum * packSizeNum + qtyPieceNum
+  const totalBaseQty = qtyBoxNum * donaPerBox + qtyPackNum * packSizeNum + qtyPieceNum
 
-  // Kirim (ADD): tortilgan o'rtacha narx preview
-  const addQtyNum = Math.max(0, Math.floor(Number(addQtyField) || 0))
-  const addPriceRaw = Math.max(0, Number(addPriceField) || 0)
+  // Kirim (ADD): tanlangan mahsulot pog'onalari
   const addPackSize = Math.max(1, Math.floor(Number(selectedItem?.packSize ?? 1)))
+  const addBoxSize = Math.max(1, Math.floor(Number(selectedItem?.boxSize ?? 1)))
   const addHasPack = addPackSize > 1
-  // Kelgan narx dona yoki pachkada — 1 dona narxiga o'giriladi
-  const addPricePerDona = (addPriceMode === 'pack' && addHasPack)
-    ? Math.round((addPriceRaw / addPackSize) * 100) / 100
-    : addPriceRaw
+  const addHasBox = addHasPack && addBoxSize > 1
+  const addDonaPerBox = addPackSize * addBoxSize
+  // Kirim miqdori tanlangan birlikda -> bazaviy dona
+  const addQtyNum = Math.max(0, Math.floor(Number(addQtyField) || 0))
+  const addQtyBase = (addQtyMode === 'box' && addHasBox)
+    ? addQtyNum * addDonaPerBox
+    : (addQtyMode === 'pack' && addHasPack)
+      ? addQtyNum * addPackSize
+      : addQtyNum
+  // Kelgan narx tanlangan birlikda -> 1 dona narxi
+  const addPriceRaw = Math.max(0, Number(addPriceField) || 0)
+  const addPricePerDona = (addPriceMode === 'box' && addHasBox)
+    ? Math.round((addPriceRaw / addDonaPerBox) * 100) / 100
+    : (addPriceMode === 'pack' && addHasPack)
+      ? Math.round((addPriceRaw / addPackSize) * 100) / 100
+      : addPriceRaw
   const curStockQty = Math.max(0, Number(selectedItem?.quantity ?? 0))
   const curStockPrice = Math.max(0, Number(selectedItem?.price ?? 0))
   const newAvgPrice = addPricePerDona > 0
-    ? (curStockQty > 0 ? (curStockQty * curStockPrice + addQtyNum * addPricePerDona) / (curStockQty + addQtyNum) : addPricePerDona)
+    ? (curStockQty > 0 ? (curStockQty * curStockPrice + addQtyBase * addPricePerDona) / (curStockQty + addQtyBase) : addPricePerDona)
     : curStockPrice
   const fmtSom = (n: number) => Math.round(n).toLocaleString('ru-RU')
 
-  // Yangi mahsulot: narx dona/pachkada kiritiladi -> 1 dona narxiga o'giriladi
+  // Yangi mahsulot: narx dona/pachka/katta pachkada -> 1 dona narxi
   const newPriceRaw = Math.max(0, Number(newPriceField) || 0)
-  const newPricePerDona = (newPriceMode === 'pack' && packSizeNum > 1)
-    ? Math.round((newPriceRaw / packSizeNum) * 100) / 100
-    : newPriceRaw
+  const newPricePerDona = (newPriceMode === 'box' && hasBox)
+    ? Math.round((newPriceRaw / donaPerBox) * 100) / 100
+    : (newPriceMode === 'pack' && hasPack)
+      ? Math.round((newPriceRaw / packSizeNum) * 100) / 100
+      : newPriceRaw
 
   // Birlik sozlash bloki (NEW va UNIT tab uchun umumiy)
   const unitConfigBlock = (
@@ -345,10 +376,37 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
           className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner disabled:opacity-40"
         />
       </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">1 {boxUnitField || 'karobka'} = nechta {packUnitField || 'pachka'}</label>
+        <input
+          name="boxSize"
+          type="number"
+          min="1"
+          value={boxSizeField}
+          onChange={(e) => setBoxSizeField(e.target.value)}
+          placeholder="1 = katta pachka yo'q"
+          disabled={!hasPack}
+          className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner disabled:opacity-40"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Katta pachka nomi</label>
+        <input
+          name="boxUnit"
+          type="text"
+          value={boxUnitField}
+          onChange={(e) => setBoxUnitField(e.target.value)}
+          placeholder="karobka"
+          disabled={!hasBox}
+          className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner disabled:opacity-40"
+        />
+      </div>
       <div className="sm:col-span-3 text-xs text-zinc-900/40 font-medium -mt-1">
-        {hasPack
-          ? `1 ${packUnitField || 'pachka'} = ${packSizeNum} ${unitField || 'dona'}. Mini-appda chiqimda ikkalasini tanlash mumkin bo'ladi.`
-          : `Pachka yo'q — faqat ${unitField || 'dona'}. Pachka qo'shish uchun "1 pachkada nechta dona" ni 1 dan katta qiling.`}
+        {hasBox
+          ? `1 ${boxUnitField || 'karobka'} = ${boxSizeNum} ${packUnitField || 'pachka'} = ${donaPerBox} ${unitField || 'dona'} · 1 ${packUnitField || 'pachka'} = ${packSizeNum} ${unitField || 'dona'}.`
+          : hasPack
+            ? `1 ${packUnitField || 'pachka'} = ${packSizeNum} ${unitField || 'dona'}. Katta pachka (karobka) uchun "1 karobka = nechta pachka" ni 1 dan katta qiling.`
+            : `Pachka yo'q — faqat ${unitField || 'dona'}. Pachka qo'shish uchun "1 pachkada nechta dona" ni 1 dan katta qiling.`}
       </div>
     </div>
   )
@@ -357,9 +415,23 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   const newQtyBlock = (
     <div className="w-full">
       <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
-        Boshlang'ich miqdor {hasPack ? '(pachka va/yoki dona)' : `(${unitField || 'dona'})`}
+        Boshlang'ich miqdor {hasBox ? '(katta pachka / pachka / dona)' : hasPack ? '(pachka va/yoki dona)' : `(${unitField || 'dona'})`}
       </label>
       <div className="flex flex-wrap items-start gap-4">
+        {hasBox && (
+          <div className="w-32">
+            <input
+              name="qtyBox"
+              type="number"
+              min="0"
+              value={qtyBoxField}
+              onChange={(e) => setQtyBoxField(e.target.value)}
+              placeholder="0"
+              className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner text-center"
+            />
+            <span className="block mt-1.5 text-[11px] text-zinc-900/50 font-semibold text-center uppercase tracking-wider">{boxUnitField || 'karobka'}</span>
+          </div>
+        )}
         {hasPack && (
           <div className="w-32">
             <input
@@ -390,8 +462,8 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
           <div className="flex-1 min-w-[150px] flex items-center pt-1">
             <div className="px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm font-bold text-emerald-600">
               Jami: {totalBaseQty} {unitField || 'dona'}
-              {qtyPackNum > 0 && (
-                <span className="text-emerald-600/60 font-medium"> · {qtyPackNum} {packUnitField || 'pachka'}{qtyPieceNum > 0 ? ` ${qtyPieceNum} ${unitField || 'dona'}` : ''}</span>
+              {(qtyBoxNum > 0 || qtyPackNum > 0 || qtyPieceNum > 0) && (
+                <span className="text-emerald-600/60 font-medium"> · {qtyBoxNum > 0 ? `${qtyBoxNum} ${boxUnitField || 'karobka'} ` : ''}{qtyPackNum > 0 ? `${qtyPackNum} ${packUnitField || 'pachka'} ` : ''}{qtyPieceNum > 0 ? `${qtyPieceNum} ${unitField || 'dona'}` : ''}</span>
               )}
             </div>
           </div>
@@ -457,7 +529,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
               </div>
               <div className="w-full sm:w-64">
                 <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
-                  Narx — 1 {newPriceMode === 'pack' && hasPack ? (packUnitField || 'pachka') : (unitField || 'dona')} (so'm)
+                  Narx — 1 {newPriceMode === 'box' && hasBox ? (boxUnitField || 'karobka') : newPriceMode === 'pack' && hasPack ? (packUnitField || 'pachka') : (unitField || 'dona')} (so'm)
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -484,14 +556,23 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                       >
                         {packUnitField || 'pachka'}
                       </button>
+                      {hasBox && (
+                        <button
+                          type="button"
+                          onClick={() => setNewPriceMode('box')}
+                          className={`px-3 text-xs font-bold transition-colors ${newPriceMode === 'box' ? 'bg-amber-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}
+                        >
+                          {boxUnitField || 'karobka'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
                 {/* Server har doim 1 dona narxini oladi */}
                 <input type="hidden" name="price" value={String(newPricePerDona)} readOnly />
-                {hasPack && newPriceMode === 'pack' && newPriceRaw > 0 && (
+                {newPriceRaw > 0 && ((newPriceMode === 'pack' && hasPack) || (newPriceMode === 'box' && hasBox)) && (
                   <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">
-                    = {fmtSom(newPricePerDona)} so'm / {unitField || 'dona'} · (1 {packUnitField || 'pachka'} = {packSizeNum} {unitField || 'dona'})
+                    = {fmtSom(newPricePerDona)} so'm / {unitField || 'dona'} · (1 {newPriceMode === 'box' ? (boxUnitField || 'karobka') : (packUnitField || 'pachka')} = {newPriceMode === 'box' ? donaPerBox : packSizeNum} {unitField || 'dona'})
                   </p>
                 )}
               </div>
@@ -516,22 +597,47 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                   selectedItem={selectedItem}
                 />
               </div>
-              <div className="w-full sm:w-36">
-                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Miqdori {selectedItem ? `(${selectedItem.unit || 'dona'})` : ''}</label>
-                <input
-                  name="quantity"
-                  type="number"
-                  required
-                  min="1"
-                  value={addQtyField}
-                  onChange={(e) => setAddQtyField(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
-                />
+              <div className="w-full sm:w-60">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
+                  Miqdori — {addQtyMode === 'box' && addHasBox ? (selectedItem?.boxUnit || 'karobka') : addQtyMode === 'pack' && addHasPack ? (selectedItem?.packUnit || 'pachka') : (selectedItem?.unit || 'dona')}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={addQtyField}
+                    onChange={(e) => setAddQtyField(e.target.value)}
+                    placeholder="0"
+                    className="flex-1 w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
+                  />
+                  {addHasPack && (
+                    <div className="flex rounded-xl border border-white/60 overflow-hidden shrink-0 shadow-inner">
+                      <button type="button" onClick={() => setAddQtyMode('piece')}
+                        className={`px-2.5 text-xs font-bold transition-colors ${addQtyMode === 'piece' ? 'bg-emerald-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}>
+                        {selectedItem?.unit || 'dona'}
+                      </button>
+                      <button type="button" onClick={() => setAddQtyMode('pack')}
+                        className={`px-2.5 text-xs font-bold transition-colors ${addQtyMode === 'pack' ? 'bg-emerald-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}>
+                        {selectedItem?.packUnit || 'pachka'}
+                      </button>
+                      {addHasBox && (
+                        <button type="button" onClick={() => setAddQtyMode('box')}
+                          className={`px-2.5 text-xs font-bold transition-colors ${addQtyMode === 'box' ? 'bg-emerald-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}>
+                          {selectedItem?.boxUnit || 'karobka'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <input type="hidden" name="quantity" value={String(addQtyBase)} readOnly />
+                {addQtyMode !== 'piece' && addQtyNum > 0 && (
+                  <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">= {addQtyBase} {selectedItem?.unit || 'dona'}</p>
+                )}
               </div>
               <div className="w-full sm:w-56">
                 <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
-                  Kelgan narx — 1 {addPriceMode === 'pack' && addHasPack ? (selectedItem?.packUnit || 'pachka') : (selectedItem?.unit || 'dona')} (so'm)
+                  Kelgan narx — 1 {addPriceMode === 'box' && addHasBox ? (selectedItem?.boxUnit || 'karobka') : addPriceMode === 'pack' && addHasPack ? (selectedItem?.packUnit || 'pachka') : (selectedItem?.unit || 'dona')} (so'm)
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -558,35 +664,44 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                       >
                         {selectedItem?.packUnit || 'pachka'}
                       </button>
+                      {addHasBox && (
+                        <button
+                          type="button"
+                          onClick={() => setAddPriceMode('box')}
+                          className={`px-3 text-xs font-bold transition-colors ${addPriceMode === 'box' ? 'bg-amber-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}
+                        >
+                          {selectedItem?.boxUnit || 'karobka'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
                 {/* Server har doim 1 dona narxini oladi */}
                 <input type="hidden" name="price" value={String(addPricePerDona)} readOnly />
-                {addHasPack && addPriceMode === 'pack' && addPriceRaw > 0 && (
+                {addPriceRaw > 0 && ((addPriceMode === 'pack' && addHasPack) || (addPriceMode === 'box' && addHasBox)) && (
                   <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">
-                    = {fmtSom(addPricePerDona)} so'm / {selectedItem?.unit || 'dona'} · (1 {selectedItem?.packUnit || 'pachka'} = {addPackSize} {selectedItem?.unit || 'dona'})
+                    = {fmtSom(addPricePerDona)} so'm / {selectedItem?.unit || 'dona'} · (1 {addPriceMode === 'box' ? (selectedItem?.boxUnit || 'karobka') : (selectedItem?.packUnit || 'pachka')} = {addPriceMode === 'box' ? addDonaPerBox : addPackSize} {selectedItem?.unit || 'dona'})
                   </p>
                 )}
               </div>
             </div>
 
-            {selectedItem && addQtyNum > 0 && addPriceRaw > 0 && (
+            {selectedItem && addQtyBase > 0 && addPriceRaw > 0 && (
               <div className="px-5 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-zinc-900/70">
                   <span>Hozirgi: <b className="text-zinc-900">{curStockQty}</b> × {fmtSom(curStockPrice)} so'm</span>
                   <span className="text-zinc-900/30">+</span>
-                  <span>keldi: <b className="text-zinc-900">{addQtyNum}</b> × {fmtSom(addPricePerDona)} so'm</span>
+                  <span>keldi: <b className="text-zinc-900">{addQtyBase}</b> {selectedItem.unit || 'dona'} × {fmtSom(addPricePerDona)} so'm</span>
                   <span className="text-zinc-900/30">→</span>
                   <span className="font-bold text-emerald-700">yangi o'rtacha: {fmtSom(newAvgPrice)} so'm</span>
-                  <span className="text-zinc-900/40">· yangi qoldiq {curStockQty + addQtyNum} {selectedItem.unit || 'dona'}</span>
+                  <span className="text-zinc-900/40">· yangi qoldiq {curStockQty + addQtyBase} {selectedItem.unit || 'dona'}</span>
                 </div>
               </div>
             )}
 
             <p className="text-xs text-zinc-900/40 font-medium -mt-1">
               <b>Kelgan narx</b> kiritilsa — tizim <b>tortilgan o'rtacha narx</b>ni avtomatik hisoblaydi (eski qoldiq + yangi partiya). Bo'sh qoldirsangiz eski narx saqlanadi.
-              {addHasPack ? ' Narxni dona yoki pachka hisobida kiritishingiz mumkin — yonidagi tugmadan tanlang.' : ''}
+              {addHasPack ? ` Miqdor va narxni dona / ${selectedItem?.packUnit || 'pachka'}${addHasBox ? ` / ${selectedItem?.boxUnit || 'karobka'}` : ''} hisobida — yonidagi tugmadan tanlab kiriting.` : ''}
             </p>
           </>
         )}
