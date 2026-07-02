@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from 'react'
 import { createNewItem, addStock, setItemUnit } from '@/app/actions'
 import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2 } from 'lucide-react'
 
-type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number }
+type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number, quantity?: number }
 
 // O'yin uslubidagi chiroyli ranglar
 const gradientColors = [
@@ -183,6 +183,9 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   // Yangi mahsulot boshlang'ich miqdori (pachka + dona)
   const [qtyPackField, setQtyPackField] = useState('')
   const [qtyPieceField, setQtyPieceField] = useState('')
+  // Kirim (ADD): miqdor + kelgan narx
+  const [addQtyField, setAddQtyField] = useState('')
+  const [addPriceField, setAddPriceField] = useState('')
 
   const resetUnitFields = () => {
     setNameField('')
@@ -192,6 +195,8 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     setPriceField('')
     setQtyPackField('')
     setQtyPieceField('')
+    setAddQtyField('')
+    setAddPriceField('')
   }
 
   const handleTabChange = (tab: 'NEW' | 'ADD' | 'UNIT') => {
@@ -272,6 +277,16 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   const qtyPackNum = Math.max(0, Math.floor(Number(qtyPackField) || 0))
   const qtyPieceNum = Math.max(0, Math.floor(Number(qtyPieceField) || 0))
   const totalBaseQty = qtyPackNum * packSizeNum + qtyPieceNum
+
+  // Kirim (ADD): tortilgan o'rtacha narx preview
+  const addQtyNum = Math.max(0, Math.floor(Number(addQtyField) || 0))
+  const addPriceNum = Math.max(0, Number(addPriceField) || 0)
+  const curStockQty = Math.max(0, Number(selectedItem?.quantity ?? 0))
+  const curStockPrice = Math.max(0, Number(selectedItem?.price ?? 0))
+  const newAvgPrice = addPriceNum > 0
+    ? (curStockQty > 0 ? (curStockQty * curStockPrice + addQtyNum * addPriceNum) / (curStockQty + addQtyNum) : addPriceNum)
+    : curStockPrice
+  const fmtSom = (n: number) => Math.round(n).toLocaleString('ru-RU')
 
   // Birlik sozlash bloki (NEW va UNIT tab uchun umumiy)
   const unitConfigBlock = (
@@ -441,28 +456,62 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
         )}
 
         {activeTab === 'ADD' && (
-          <div className="flex flex-col sm:flex-row gap-5 items-end">
-            <div className="flex-1 w-full">
-              <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Katalogdan tanlang</label>
-              <CatalogModal
-                items={items}
-                name="itemId"
-                onSelect={setSelectedItem}
-                selectedItem={selectedItem}
-              />
+          <>
+            <div className="flex flex-col sm:flex-row gap-5 items-end">
+              <div className="flex-1 w-full">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Katalogdan tanlang</label>
+                <CatalogModal
+                  items={items}
+                  name="itemId"
+                  onSelect={setSelectedItem}
+                  selectedItem={selectedItem}
+                />
+              </div>
+              <div className="w-full sm:w-36">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Miqdori {selectedItem ? `(${selectedItem.unit || 'dona'})` : ''}</label>
+                <input
+                  name="quantity"
+                  type="number"
+                  required
+                  min="1"
+                  value={addQtyField}
+                  onChange={(e) => setAddQtyField(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
+                />
+              </div>
+              <div className="w-full sm:w-44">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Kelgan narx — 1 {selectedItem?.unit || 'dona'} (so'm)</label>
+                <input
+                  name="price"
+                  type="number"
+                  min="0"
+                  value={addPriceField}
+                  onChange={(e) => setAddPriceField(e.target.value)}
+                  placeholder="ixtiyoriy"
+                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
+                />
+              </div>
             </div>
-            <div className="w-full sm:w-40">
-              <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Miqdori</label>
-              <input
-                name="quantity"
-                type="number"
-                required
-                min="1"
-                placeholder="0"
-                className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"
-              />
-            </div>
-          </div>
+
+            {selectedItem && addQtyNum > 0 && addPriceNum > 0 && (
+              <div className="px-5 py-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-sm">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-zinc-900/70">
+                  <span>Hozirgi: <b className="text-zinc-900">{curStockQty}</b> × {fmtSom(curStockPrice)} so'm</span>
+                  <span className="text-zinc-900/30">+</span>
+                  <span>keldi: <b className="text-zinc-900">{addQtyNum}</b> × {fmtSom(addPriceNum)} so'm</span>
+                  <span className="text-zinc-900/30">→</span>
+                  <span className="font-bold text-emerald-700">yangi o'rtacha: {fmtSom(newAvgPrice)} so'm</span>
+                  <span className="text-zinc-900/40">· yangi qoldiq {curStockQty + addQtyNum} {selectedItem.unit || 'dona'}</span>
+                </div>
+              </div>
+            )}
+
+            <p className="text-xs text-zinc-900/40 font-medium -mt-1">
+              <b>Kelgan narx</b> kiritilsa — tizim <b>tortilgan o'rtacha narx</b>ni avtomatik hisoblaydi (eski qoldiq + yangi partiya). Bo'sh qoldirsangiz eski narx saqlanadi.
+              {selectedItem && (selectedItem.packSize ?? 1) > 1 ? ` Bu mahsulot pachkali (1 ${selectedItem.packUnit || 'pachka'} = ${selectedItem.packSize} ${selectedItem.unit || 'dona'}) — narxni 1 ${selectedItem.unit || 'dona'}ga hisoblab kiriting.` : ''}
+            </p>
+          </>
         )}
 
         {activeTab === 'UNIT' && (

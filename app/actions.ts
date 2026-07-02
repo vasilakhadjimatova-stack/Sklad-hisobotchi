@@ -60,6 +60,11 @@ export async function addStock(formData: FormData) {
   const itemId = formData.get('itemId')?.toString()
   const quantity = Number(formData.get('quantity'))
 
+  // Kelgan narx (1 bazaviy dona uchun) — ixtiyoriy
+  const priceRaw = formData.get('price')
+  const hasPrice = priceRaw !== null && priceRaw.toString().trim() !== '' && !isNaN(Number(priceRaw))
+  const incomingPrice = hasPrice ? Math.max(0, Number(priceRaw)) : null
+
   if (!itemId || isNaN(quantity) || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri" }
 
   try {
@@ -69,9 +74,18 @@ export async function addStock(formData: FormData) {
     const admin = await getAdminUser()
     const newQuantity = item.quantity + quantity
 
+    // Tortilgan o'rtacha narx: narx kiritilsa yangilanadi, aks holda eski narx qoladi
+    let newPrice = item.price
+    if (incomingPrice !== null) {
+      const oldQty = Math.max(0, item.quantity)
+      newPrice = oldQty > 0
+        ? Math.round(((oldQty * item.price + quantity * incomingPrice) / (oldQty + quantity)) * 100) / 100
+        : incomingPrice
+    }
+
     await prisma.item.update({
       where: { id: itemId },
-      data: { quantity: newQuantity }
+      data: { quantity: newQuantity, price: newPrice }
     })
 
     await prisma.transaction.create({
@@ -80,7 +94,9 @@ export async function addStock(formData: FormData) {
         itemId: item.id,
         quantity: quantity,
         type: 'ADD',
-        status: 'APPROVED'
+        status: 'APPROVED',
+        // Xarid narxi tarixi (kelgan narx × miqdor)
+        totalPrice: incomingPrice !== null ? quantity * incomingPrice : null,
       }
     })
 
