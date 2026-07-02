@@ -186,6 +186,9 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   // Kirim (ADD): miqdor + kelgan narx
   const [addQtyField, setAddQtyField] = useState('')
   const [addPriceField, setAddPriceField] = useState('')
+  // Yangi mahsulot: narx qiymati + narx birligi (dona yoki pachka)
+  const [newPriceField, setNewPriceField] = useState('')
+  const [newPriceMode, setNewPriceMode] = useState<'piece' | 'pack'>('piece')
 
   const resetUnitFields = () => {
     setNameField('')
@@ -197,6 +200,8 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     setQtyPieceField('')
     setAddQtyField('')
     setAddPriceField('')
+    setNewPriceField('')
+    setNewPriceMode('piece')
   }
 
   const handleTabChange = (tab: 'NEW' | 'ADD' | 'UNIT') => {
@@ -287,6 +292,12 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     ? (curStockQty > 0 ? (curStockQty * curStockPrice + addQtyNum * addPriceNum) / (curStockQty + addQtyNum) : addPriceNum)
     : curStockPrice
   const fmtSom = (n: number) => Math.round(n).toLocaleString('ru-RU')
+
+  // Yangi mahsulot: narx dona/pachkada kiritiladi -> 1 dona narxiga o'giriladi
+  const newPriceRaw = Math.max(0, Number(newPriceField) || 0)
+  const newPricePerDona = (newPriceMode === 'pack' && packSizeNum > 1)
+    ? Math.round((newPriceRaw / packSizeNum) * 100) / 100
+    : newPriceRaw
 
   // Birlik sozlash bloki (NEW va UNIT tab uchun umumiy)
   const unitConfigBlock = (
@@ -436,21 +447,51 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                   className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all shadow-inner"
                 />
               </div>
-              <div className="w-full sm:w-52">
-                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Narx — 1 {unitField || 'dona'} (so'm)</label>
-                <input
-                  name="price"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
-                />
+              <div className="w-full sm:w-64">
+                <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
+                  Narx — 1 {newPriceMode === 'pack' && hasPack ? (packUnitField || 'pachka') : (unitField || 'dona')} (so'm)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={newPriceField}
+                    onChange={(e) => setNewPriceField(e.target.value)}
+                    placeholder="0"
+                    className="flex-1 w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all shadow-inner"
+                  />
+                  {hasPack && (
+                    <div className="flex rounded-xl border border-white/60 overflow-hidden shrink-0 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => setNewPriceMode('piece')}
+                        className={`px-3 text-xs font-bold transition-colors ${newPriceMode === 'piece' ? 'bg-amber-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}
+                      >
+                        {unitField || 'dona'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewPriceMode('pack')}
+                        className={`px-3 text-xs font-bold transition-colors ${newPriceMode === 'pack' ? 'bg-amber-500 text-white' : 'bg-white/50 text-zinc-900/50 hover:bg-white/80'}`}
+                      >
+                        {packUnitField || 'pachka'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {/* Server har doim 1 dona narxini oladi */}
+                <input type="hidden" name="price" value={String(newPricePerDona)} readOnly />
+                {hasPack && newPriceMode === 'pack' && newPriceRaw > 0 && (
+                  <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">
+                    = {fmtSom(newPricePerDona)} so'm / {unitField || 'dona'} · (1 {packUnitField || 'pachka'} = {packSizeNum} {unitField || 'dona'})
+                  </p>
+                )}
               </div>
             </div>
             {unitConfigBlock}
             {newQtyBlock}
             <p className="text-xs text-zinc-900/40 font-medium -mt-1">
-              Narx 1 {unitField || 'dona'} uchun. Pachkali bo'lsa: pachka narxini {packSizeNum} ga bo'lib kiriting (mini-app xarajatni shu narxdan hisoblaydi).
+              Narxni {hasPack ? `1 ${unitField || 'dona'}ga yoki 1 ${packUnitField || 'pachka'}ga` : `1 ${unitField || 'dona'}ga`} hisoblab kiriting — tizim ichkarida har doim 1 {unitField || 'dona'} narxida saqlaydi (chiqim shu narxdan hisoblanadi).
             </p>
           </>
         )}
