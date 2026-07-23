@@ -161,6 +161,34 @@ export async function setItemUnit(formData: FormData) {
   }
 }
 
+// Mahsulotni butunlay o'chirish (tugagan yoki dublikat tozalash uchun).
+// DIQQAT: mahsulot bilan bog'liq barcha tranzaksiya tarixi ham o'chadi
+// (Transaction.itemId majburiy FK — avval tranzaksiyalar o'chiriladi).
+export async function deleteItem(formData: FormData) {
+  const itemId = formData.get('itemId')?.toString()
+  if (!itemId) return { error: "Mahsulot tanlanmadi" }
+
+  try {
+    const item = await prisma.item.findUnique({ where: { id: itemId } })
+    if (!item) return { error: "Mahsulot topilmadi" }
+
+    // FK cheklovi: avval shu mahsulotning tranzaksiyalari, so'ng mahsulotning o'zi.
+    await prisma.$transaction([
+      prisma.transaction.deleteMany({ where: { itemId } }),
+      prisma.item.delete({ where: { id: itemId } }),
+    ])
+
+    revalidatePath('/')
+    revalidatePath('/items')
+    revalidatePath('/tozalash')
+    revalidatePath('/history')
+    return { success: true }
+  } catch (err) {
+    console.error(err)
+    return { error: "Xatolik yuz berdi" }
+  }
+}
+
 export async function adjustStock(formData: FormData) {
   const itemId = formData.get('itemId')?.toString()
   const newQuantity = Number(formData.get('quantity'))
