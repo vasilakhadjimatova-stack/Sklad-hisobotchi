@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 
 export default async function ItemsPage() {
   const items = await prisma.item.findMany({
-    orderBy: { name: 'asc' }
+    orderBy: { name: 'asc' },
+    include: { _count: { select: { transactions: true } } },
   })
 
   return (

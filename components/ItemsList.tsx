@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Edit3, Check, X, AlertTriangle } from 'lucide-react'
-import { adjustStock } from '@/app/actions'
+import { Edit3, Check, X, AlertTriangle, Trash2 } from 'lucide-react'
+import { adjustStock, deleteItem } from '@/app/actions'
 
 type Item = {
   id: string
@@ -11,6 +11,7 @@ type Item = {
   quantity: number
   unit: string
   updatedAt: any // Can be string or Date after serialization
+  _count?: { transactions: number }
 }
 
 export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
@@ -18,6 +19,8 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
   const [newQuantity, setNewQuantity] = useState<string>('')
   const [reason, setReason] = useState<string>('Inventarizatsiya tahriri')
   const [loading, setLoading] = useState(false)
+  const [deletingItem, setDeletingItem] = useState<Item | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -48,6 +51,28 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
       alert("Aloqa xatosi")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deletingItem) return
+
+    setDeleteLoading(true)
+    try {
+      const formData = new FormData()
+      formData.append('itemId', deletingItem.id)
+
+      const result = await deleteItem(formData)
+      if (result.success) {
+        setDeletingItem(null)
+        window.location.reload()
+      } else {
+        alert(result.error || "Xatolik yuz berdi")
+      }
+    } catch (err) {
+      alert("Aloqa xatosi")
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -88,19 +113,33 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
                 </span>
               </td>
               <td className="p-5 text-right">
-                <button 
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    setEditingItem(item)
-                    setNewQuantity(item.quantity.toString())
-                  }}
-                  className="px-4 py-2 rounded-xl bg-white/40 text-zinc-900/60 hover:bg-brand-500/20 hover:text-brand-400 transition-all border border-white/60 inline-flex items-center gap-2 text-xs font-bold relative z-10"
-                >
-                  <Edit3 size={14} />
-                  TUZATISH
-                </button>
+                <div className="inline-flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setEditingItem(item)
+                      setNewQuantity(item.quantity.toString())
+                    }}
+                    className="px-4 py-2 rounded-xl bg-white/40 text-zinc-900/60 hover:bg-brand-500/20 hover:text-brand-400 transition-all border border-white/60 inline-flex items-center gap-2 text-xs font-bold relative z-10"
+                  >
+                    <Edit3 size={14} />
+                    TUZATISH
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setDeletingItem(item)
+                    }}
+                    className="px-4 py-2 rounded-xl bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-all border border-rose-500/20 inline-flex items-center gap-2 text-xs font-bold relative z-10"
+                  >
+                    <Trash2 size={14} />
+                    O'CHIRISH
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
@@ -172,6 +211,53 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingItem && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !deleteLoading && setDeletingItem(null)}></div>
+          <div className="glass-card w-full max-w-md rounded-[2.5rem] border border-white/60 shadow-2xl relative z-[10000] overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-8 border-b border-white/60 flex justify-between items-center bg-white/40">
+              <div>
+                <h3 className="text-xl font-black text-zinc-900 uppercase tracking-tight">Mahsulotni o'chirish</h3>
+                <p className="text-zinc-900/40 text-xs mt-1">{deletingItem.name}</p>
+              </div>
+              <button type="button" onClick={() => !deleteLoading && setDeletingItem(null)} className="text-zinc-900/20 hover:text-zinc-900 transition-colors p-2">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6">
+              <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl flex gap-3 items-start">
+                <AlertTriangle className="text-rose-500 shrink-0" size={18} />
+                <p className="text-[12px] text-rose-900/70 leading-relaxed font-medium">
+                  Bu mahsulot butunlay o'chiriladi{typeof deletingItem._count?.transactions === 'number' ? <> va uning <b>{deletingItem._count.transactions} ta</b> tranzaksiya (kirim/chiqim) tarixi ham o'chib ketadi</> : ' va unga bog\'liq barcha tranzaksiya tarixi ham o\'chib ketadi'}. Bu amalni orqaga qaytarib bo'lmaydi.
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setDeletingItem(null)}
+                  disabled={deleteLoading}
+                  className="flex-1 py-4 rounded-2xl bg-white/40 text-zinc-900/50 font-bold hover:bg-white/60 transition-all uppercase text-xs tracking-widest disabled:opacity-50"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleteLoading}
+                  className="flex-1 py-4 rounded-2xl bg-rose-500 text-white font-black hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/20 uppercase text-xs tracking-widest disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                >
+                  <Trash2 size={14} />
+                  {deleteLoading ? "O'CHIRILMOQDA..." : "O'CHIRISH"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
