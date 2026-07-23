@@ -33,7 +33,8 @@ const som = (n: number) => `${Math.round(n).toLocaleString('ru-RU')} so'm`
 
 export default function InventoryReconcile({ rows, month, adjustments }: { rows: Row[]; month: string; adjustments: Adjustment[] }) {
   const router = useRouter()
-  const [counts, setCounts] = useState<Record<string, string>>({})
+  // Haqiqiy sanoq: har mahsulot uchun pachka + dona alohida saqlanadi.
+  const [entries, setEntries] = useState<Record<string, { pack: string; piece: string }>>({})
   const [search, setSearch] = useState('')
   const [onlyMismatch, setOnlyMismatch] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -55,13 +56,32 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
     return () => window.removeEventListener('keydown', onKey)
   }, [selected, summaryOpen])
 
-  const diffOf = (r: Row): number | null => {
-    const v = counts[r.id]
-    if (v === undefined || v.trim() === '') return null
-    const p = parseInt(v, 10)
-    if (isNaN(p)) return null
-    return p - r.qty
+  // Kiritilgan haqiqiy sanoqni bazaviy donaga aylantirish: pachka×packSize + dona.
+  // Ikkala katak ham bo'sh bo'lsa null (sanalmagan).
+  const baseOf = (r: Row): number | null => {
+    const e = entries[r.id]
+    if (!e) return null
+    const packStr = (e.pack ?? '').trim()
+    const pieceStr = (e.piece ?? '').trim()
+    if (packStr === '' && pieceStr === '') return null
+    const packN = packStr === '' ? 0 : parseInt(packStr, 10)
+    const pieceN = pieceStr === '' ? 0 : parseInt(pieceStr, 10)
+    if (isNaN(packN) || isNaN(pieceN)) return null
+    const ps = Math.max(1, r.packSize || 1)
+    return packN * ps + pieceN
   }
+
+  const diffOf = (r: Row): number | null => {
+    const b = baseOf(r)
+    if (b === null) return null
+    return b - r.qty
+  }
+
+  const setEntry = (id: string, field: 'pack' | 'piece', value: string) =>
+    setEntries(prev => ({
+      ...prev,
+      [id]: { pack: prev[id]?.pack ?? '', piece: prev[id]?.piece ?? '', [field]: value },
+    }))
 
   const stats = useMemo(() => {
     let counted = 0, mismatch = 0, net = 0
@@ -73,7 +93,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
       }
     }
     return { counted, mismatch, net }
-  }, [counts, rows])
+  }, [entries, rows])
 
   // O'tgan tuzatishlar xulosasi (shu oy) — sahifa bo'sh ko'rinmasligi uchun
   const adjSummary = useMemo(() => {
@@ -96,10 +116,9 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
 
   const save = async () => {
     const payload = rows
-      .map(r => ({ itemId: r.id, raw: counts[r.id] }))
-      .filter(c => c.raw !== undefined && c.raw.trim() !== '')
-      .map(c => ({ itemId: c.itemId, physical: parseInt(c.raw, 10) }))
-      .filter(c => Number.isFinite(c.physical) && c.physical >= 0)
+      .map(r => ({ itemId: r.id, physical: baseOf(r) }))
+      .filter((c): c is { itemId: string; physical: number } =>
+        c.physical !== null && Number.isFinite(c.physical) && c.physical >= 0)
 
     if (payload.length === 0) { setMsg('Avval haqiqiy sanoqni kiriting.'); return }
     if (!confirm(`${payload.length} ta mahsulot bo'yicha qoldiq haqiqiy songa to'g'rilanadimi? (Farqlar ADJUST sifatida yoziladi)`)) return
@@ -115,7 +134,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
       if (d.success) {
         setMsg('')
         setCorrected(Array.isArray(d.details) ? d.details : [])
-        setCounts({})
+        setEntries({})
         router.refresh()
       } else setMsg(d.error || 'Xato')
     } catch {
@@ -301,10 +320,19 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
               ) : visible.map(r => {
                 const d = diffOf(r)
                 const u = (r.unit || 'dona').toLowerCase()
+                const ps = Math.max(1, r.packSize || 1)
+                const pu = (r.packUnit || 'pachka').toLowerCase()
+                const hasPack = ps > 1
+                const base = baseOf(r)
                 const rowBg = d !== null && d !== 0 ? 'bg-rose-500/[0.04]' : ''
                 return (
                   <tr key={r.id} className={`hover:bg-white/40 transition-colors ${rowBg}`}>
-                    <td className="p-4 font-medium text-zinc-900/90">{r.name}</td>
+                    <td className="p-4 font-medium text-zinc-900/90">
+                      {r.name}
+                      {hasPack && (
+                        <span className="block text-[11px] text-zinc-400 font-normal mt-0.5">1 {pu} = {ps} {u}</span>
+                      )}
+                    </td>
                     <td className="p-4 text-right text-rose-500 font-bold tabular-nums">
                       {r.used > 0 ? `−${r.used}` : '0'} <span className="text-zinc-400 font-normal text-xs">{u}</span>
                     </td>
@@ -312,15 +340,45 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
                       {r.qty} <span className="text-zinc-400 font-normal text-xs">{u}</span>
                     </td>
                     <td className="p-4 text-right">
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={0}
-                        value={counts[r.id] ?? ''}
-                        onChange={e => setCounts(prev => ({ ...prev, [r.id]: e.target.value }))}
-                        placeholder="—"
-                        className="w-28 text-right bg-white/70 border border-zinc-200 shadow-inner rounded-lg py-1.5 px-3 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
-                      />
+                      {hasPack ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex flex-col items-center">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={entries[r.id]?.pack ?? ''}
+                              onChange={e => setEntry(r.id, 'pack', e.target.value)}
+                              placeholder="0"
+                              className="w-16 text-right bg-white/70 border border-zinc-200 shadow-inner rounded-lg py-1.5 px-2 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                            />
+                            <span className="text-[9px] text-zinc-400 uppercase tracking-wide mt-0.5">{pu}</span>
+                          </div>
+                          <span className="text-zinc-300 font-bold pb-4">+</span>
+                          <div className="flex flex-col items-center">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={0}
+                              value={entries[r.id]?.piece ?? ''}
+                              onChange={e => setEntry(r.id, 'piece', e.target.value)}
+                              placeholder="0"
+                              className="w-16 text-right bg-white/70 border border-zinc-200 shadow-inner rounded-lg py-1.5 px-2 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                            />
+                            <span className="text-[9px] text-zinc-400 uppercase tracking-wide mt-0.5">{u}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          value={entries[r.id]?.piece ?? ''}
+                          onChange={e => setEntry(r.id, 'piece', e.target.value)}
+                          placeholder="—"
+                          className="w-28 text-right bg-white/70 border border-zinc-200 shadow-inner rounded-lg py-1.5 px-3 text-sm font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                        />
+                      )}
                     </td>
                     <td className="p-4 text-right tabular-nums">
                       {d === null ? (
@@ -328,8 +386,13 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
                       ) : d === 0 ? (
                         <span className="inline-flex items-center gap-1 text-emerald-500 font-bold"><Check size={14} /> mos</span>
                       ) : (
-                        <span className={`inline-flex items-center gap-1 font-bold ${d < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
-                          <AlertTriangle size={13} /> {d > 0 ? '+' : ''}{d}
+                        <span className={`inline-flex flex-col items-end font-bold ${d < 0 ? 'text-rose-500' : 'text-amber-500'}`}>
+                          <span className="inline-flex items-center gap-1">
+                            <AlertTriangle size={13} /> {d > 0 ? '+' : ''}{d} <span className="text-zinc-400 font-normal text-xs">{u}</span>
+                          </span>
+                          {hasPack && base !== null && (
+                            <span className="text-[10px] text-zinc-400 font-normal">sanoq: {base} {u}</span>
+                          )}
                         </span>
                       )}
                     </td>
@@ -344,6 +407,7 @@ export default function InventoryReconcile({ rows, month, adjustments }: { rows:
       <p className="text-xs text-zinc-400 mt-4">
         Farq = haqiqiy − hisob. <span className="text-rose-500 font-medium">Manfiy (kam)</span> — hisobда ko'p ko'rsatilgan (chiqimi yozilmagan).
         <span className="text-amber-500 font-medium"> Musbat (ko'p)</span> — ortiqcha. "Tuzatish" qoldiqни haqiqiy songa moslaydi.
+        <br />Pachkali mahsulotlarda sanoqni <b>pachka + dona</b> alohida kiriting — tizim avtomatik donaga aylantiradi (har qatorda "1 pachka = N dona" ko'rsatilgan).
       </p>
 
       {selected && (
