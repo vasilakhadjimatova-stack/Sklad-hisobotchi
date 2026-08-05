@@ -161,6 +161,41 @@ export async function setItemUnit(formData: FormData) {
   }
 }
 
+// Mahsulot nomini o'zgartirish (Mahsulotlar bo'limidagi "Tuzatish" oynasi uchun).
+// Faqat nom tegadi — zaxira, narx va o'ram sozlamalari o'zgarmaydi.
+// Tarix buzilmaydi: tranzaksiyalar nom emas, itemId orqali bog'langan.
+export async function renameItem(formData: FormData) {
+  const itemId = formData.get('itemId')?.toString()
+  const name = formData.get('name')?.toString()?.trim()
+
+  if (!itemId) return { error: "Mahsulot tanlanmadi" }
+  if (!name) return { error: "Nom bo'sh bo'lishi mumkin emas" }
+
+  try {
+    const item = await prisma.item.findUnique({ where: { id: itemId } })
+    if (!item) return { error: "Mahsulot topilmadi" }
+    if (name === item.name) return { success: true }
+
+    // Nom unique — boshqa mahsulot shu nomni egallab turmaganini tekshiramiz
+    const clash = await prisma.item.findUnique({ where: { name } })
+    if (clash && clash.id !== itemId) {
+      return { error: `"${name}" nomli mahsulot allaqachon bor` }
+    }
+
+    await prisma.item.update({ where: { id: itemId }, data: { name } })
+
+    revalidatePath('/')
+    revalidatePath('/items')
+    revalidatePath('/tozalash')
+    revalidatePath('/history')
+    return { success: true }
+  } catch (err) {
+    console.error('renameItem:', err)
+    const reason = err instanceof Error ? err.message.split('\n').filter(Boolean).slice(-1)[0] : ''
+    return { error: reason ? `Nomni o'zgartirib bo'lmadi: ${reason}` : "Nomni o'zgartirib bo'lmadi" }
+  }
+}
+
 // Mahsulotni butunlay o'chirish (tugagan yoki dublikat tozalash uchun).
 // DIQQAT: mahsulot bilan bog'liq barcha tranzaksiya tarixi ham o'chadi
 // (Transaction.itemId majburiy FK — avval tranzaksiyalar o'chiriladi).
