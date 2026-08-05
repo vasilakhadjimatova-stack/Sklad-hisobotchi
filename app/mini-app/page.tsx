@@ -15,7 +15,8 @@ export default async function MiniAppPage() {
     unit: i.unit,
     price: i.price,
     packSize: i.packSize,
-    packUnit: i.packUnit
+    packUnit: i.packUnit,
+    packOnly: i.packOnly
   }))
 
   // Oxirgi kiritilgan tadbir nomlari (chiqimlardan) — tugma sifatida ko'rsatamiz.

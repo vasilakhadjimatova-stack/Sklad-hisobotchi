@@ -5,7 +5,7 @@ import { createNewItem, addStock, setItemUnit } from '@/app/actions'
 import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2 } from 'lucide-react'
 import Modal from './Modal'
 
-type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number, quantity?: number, boxUnit?: string, boxSize?: number }
+type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number, quantity?: number, boxUnit?: string, boxSize?: number, packOnly?: boolean }
 
 // O'yin uslubidagi chiroyli ranglar
 const gradientColors = [
@@ -188,6 +188,8 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   // Katta pachka (3-pog'ona) sozlamasi — NEW/UNIT tab
   const [boxSizeField, setBoxSizeField] = useState('1')
   const [boxUnitField, setBoxUnitField] = useState('karobka')
+  // Chiqim faqat pachkada bo'lsinmi (mini-ilovada dona tanlovi ko'rsatilmaydi)
+  const [packOnlyField, setPackOnlyField] = useState(false)
   // Kirim (ADD): miqdor + kelgan narx (har biri o'z birlik rejimi bilan)
   const [addQtyField, setAddQtyField] = useState('')
   const [addQtyMode, setAddQtyMode] = useState<'piece' | 'pack' | 'box'>('piece')
@@ -205,6 +207,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     setPackSizeField('1')
     setBoxUnitField('karobka')
     setBoxSizeField('1')
+    setPackOnlyField(false)
     setPriceField('')
     setQtyPackField('')
     setQtyPieceField('')
@@ -235,6 +238,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
       setPackSizeField(String(item.packSize ?? 1))
       setBoxUnitField(item.boxUnit || 'karobka')
       setBoxSizeField(String(item.boxSize ?? 1))
+      setPackOnlyField(Boolean(item.packOnly))
       setPriceField(item.price != null ? String(item.price) : '')
     } else {
       resetUnitFields()
@@ -402,6 +406,33 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
           disabled={!hasBox}
           className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner disabled:opacity-40"
         />
+      </div>
+      {/* Chiqimda dona tanlovini butunlay yopish — xodim adashib donada yozmasligi uchun */}
+      <div className="sm:col-span-3">
+        <label className={`flex items-start gap-3 p-4 rounded-xl border transition-all ${
+          hasPack
+            ? 'bg-white/50 border-white/60 cursor-pointer hover:bg-white/70'
+            : 'bg-white/20 border-white/40 opacity-40 cursor-not-allowed'
+        }`}>
+          <input
+            name="packOnly"
+            type="checkbox"
+            checked={hasPack && packOnlyField}
+            onChange={(e) => setPackOnlyField(e.target.checked)}
+            disabled={!hasPack}
+            className="mt-0.5 w-5 h-5 rounded accent-brand-500 shrink-0"
+          />
+          <span>
+            <span className="block text-sm font-bold text-zinc-900/80">
+              Chiqim faqat {packUnitField || 'pachka'}da
+            </span>
+            <span className="block text-xs text-zinc-900/40 font-medium mt-0.5">
+              {hasPack
+                ? `Yoqilsa, chiqim oynasida "${unitField || 'dona'}" tanlovi umuman ko'rsatilmaydi — faqat ${packUnitField || 'pachka'}. Zaxira baribir ${unitField || 'dona'}da hisoblanadi.`
+                : `Avval "1 pachkada nechta ${unitField || 'dona'}" ni 1 dan katta qiling.`}
+            </span>
+          </span>
+        </label>
       </div>
       <div className="sm:col-span-3 text-xs text-zinc-900/40 font-medium -mt-1">
         {hasBox
