@@ -184,8 +184,10 @@ export async function deleteItem(formData: FormData) {
     revalidatePath('/history')
     return { success: true }
   } catch (err) {
-    console.error(err)
-    return { error: "Xatolik yuz berdi" }
+    console.error('deleteItem:', err)
+    // Sababni ko'rsatamiz — aks holda foydalanuvchi "tugma ishlamayapti" deb o'ylaydi
+    const reason = err instanceof Error ? err.message.split('\n').filter(Boolean).slice(-1)[0] : ''
+    return { error: reason ? `O'chirib bo'lmadi: ${reason}` : "O'chirishda xatolik yuz berdi" }
   }
 }
 

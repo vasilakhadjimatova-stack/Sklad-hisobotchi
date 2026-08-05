@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react'
 import { createNewItem, addStock, setItemUnit } from '@/app/actions'
 import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2 } from 'lucide-react'
+import Modal from './Modal'
 
 type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number, quantity?: number, boxUnit?: string, boxSize?: number }
 
@@ -73,8 +74,9 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
       </div>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 backdrop-blur-xl bg-white/80">
-          <div className="w-full max-w-5xl bg-dark-800 border border-white/60 rounded-2xl shadow-2xl flex flex-col h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200">
+        <Modal onClose={() => setIsOpen(false)}>
+          <div className="absolute inset-0 backdrop-blur-xl bg-white/80" onClick={() => setIsOpen(false)}></div>
+          <div className="w-full max-w-5xl bg-dark-800 border border-white/60 rounded-2xl shadow-2xl flex flex-col h-[85vh] sm:h-[80vh] animate-in zoom-in-95 duration-200 relative z-[10000]">
 
             {/* Modal Header */}
             <div className="p-6 border-b border-white/60 flex items-center justify-between gap-4">
@@ -158,7 +160,7 @@ function CatalogModal({ items, name, onSelect, selectedItem }: {
               )}
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )

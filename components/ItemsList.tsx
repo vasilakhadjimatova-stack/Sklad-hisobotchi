@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Edit3, Check, X, AlertTriangle, Trash2 } from 'lucide-react'
 import { adjustStock, deleteItem } from '@/app/actions'
+import Modal from './Modal'
 
 type Item = {
   id: string
@@ -21,13 +22,6 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
   const [loading, setLoading] = useState(false)
   const [deletingItem, setDeletingItem] = useState<Item | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
-  const [isMounted, setIsMounted] = useState(false)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  if (!isMounted) return null
 
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,7 +142,7 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
 
       {/* Adjustment Modal */}
       {editingItem && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <Modal onClose={() => !loading && setEditingItem(null)}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setEditingItem(null)}></div>
           <div className="glass-card w-full max-w-md rounded-[2.5rem] border border-white/60 shadow-2xl relative z-[10000] overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-8 border-b border-white/60 flex justify-between items-center bg-white/40">
@@ -212,12 +206,12 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Delete Confirmation Modal */}
       {deletingItem && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <Modal onClose={() => !deleteLoading && setDeletingItem(null)}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !deleteLoading && setDeletingItem(null)}></div>
           <div className="glass-card w-full max-w-md rounded-[2.5rem] border border-white/60 shadow-2xl relative z-[10000] overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-8 border-b border-white/60 flex justify-between items-center bg-white/40">
@@ -259,7 +253,7 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
               </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   )
