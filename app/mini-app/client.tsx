@@ -11,6 +11,7 @@ type Item = {
   price: number
   packSize: number
   packUnit: string
+  packOnly?: boolean
 }
 
 type UnitMode = 'pack' | 'piece'
@@ -24,6 +25,10 @@ type SelectedItem = {
 
 // Mahsulot pachkali bo'lsa (packSize > 1) ikkala birlik tanlanadi
 const hasPack = (it: Item) => (it.packSize || 1) > 1
+// "Faqat pachkada" belgilangan mahsulotda dona tanlovi umuman ko'rsatilmaydi
+const isPackOnly = (it: Item) => hasPack(it) && Boolean(it.packOnly)
+// Mahsulot uchun boshlang'ich birlik rejimi
+const defaultMode = (it: Item): UnitMode => (isPackOnly(it) ? 'pack' : 'piece')
 const unitName = (it: Item, mode: UnitMode) =>
   (mode === 'pack' ? it.packUnit : it.unit || 'dona')
 // Tanlangan birlikdagi miqdorni bazaviy (dona) ga aylantirish
@@ -197,7 +202,7 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
         if (t) match = items.find(i => { const n = normalize(i.name); return n.includes(t) || t.includes(n) })
       }
       if (match && !newSel.find(s => s.item.id === match!.id)) {
-        newSel.push({ item: match, qty, mode: 'piece' })
+        newSel.push({ item: match, qty, mode: defaultMode(match) })
       }
     }
     if (newSel.length === 0) {
@@ -315,7 +320,7 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
     setSelected(prev => {
       const exists = prev.find(s => s.item.id === item.id)
       if (exists) return prev.filter(s => s.item.id !== item.id)
-      return [...prev, { item, qty: 1, mode: 'piece' as UnitMode }]
+      return [...prev, { item, qty: 1, mode: defaultMode(item) }]
     })
   }
 
@@ -583,9 +588,19 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
                         <div>
                           <div className={`font-bold text-base tracking-tight ${sel ? 'text-brand-600' : 'text-zinc-800'}`}>{item.name}</div>
                           <div className="text-xs font-medium text-zinc-500 mt-1">
-                            {item.quantity} {(item.unit || 'dona').toLowerCase()} qoldi
-                            {hasPack(item) && (
-                              <span className="text-zinc-400"> · {Math.floor((item.quantity || 0) / Math.max(1, item.packSize))} {item.packUnit}</span>
+                            {isPackOnly(item) ? (
+                              // Faqat pachkada chiqadigan mahsulotda qoldiq ham pachkada ko'rsatiladi
+                              <>
+                                {maxFor(item, 'pack')} {item.packUnit} qoldi
+                                <span className="text-zinc-400"> · {item.quantity} {(item.unit || 'dona').toLowerCase()}</span>
+                              </>
+                            ) : (
+                              <>
+                                {item.quantity} {(item.unit || 'dona').toLowerCase()} qoldi
+                                {hasPack(item) && (
+                                  <span className="text-zinc-400"> · {maxFor(item, 'pack')} {item.packUnit}</span>
+                                )}
+                              </>
                             )}
                           </div>
                         </div>
@@ -598,7 +613,12 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
 
                       {sel && (
                         <div className="px-4 pb-4 pt-1 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                          {hasPack(item) && (
+                          {isPackOnly(item) && (
+                            <div className="text-center text-[11px] font-bold text-zinc-500 bg-zinc-200/50 py-2 rounded-xl shadow-inner">
+                              Faqat {item.packUnit} ({item.packSize} {(item.unit || 'dona').toLowerCase()})
+                            </div>
+                          )}
+                          {hasPack(item) && !isPackOnly(item) && (
                             <div className="flex bg-zinc-200/50 p-1 rounded-xl shadow-inner">
                               <button
                                 onClick={() => setItemMode(item.id, 'piece')}

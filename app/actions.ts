@@ -21,6 +21,8 @@ export async function createNewItem(formData: FormData) {
   const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
   const boxUnit = formData.get('boxUnit')?.toString()?.trim() || 'karobka'
   const boxSize = Math.max(1, Math.floor(Number(formData.get('boxSize')) || 1))
+  // Chiqim faqat pachkada bo'lsin — pachkasi yo'q mahsulotda ma'nosiz
+  const packOnly = packSize > 1 && formData.get('packOnly') === 'on'
   const price = Math.max(0, Number(formData.get('price')) || 0) // 1 bazaviy birlik (dona) narxi
 
   // Boshlang'ich miqdor katta pachka / pachka / donada kiritiladi — bazaviy donaga aylantiriladi
@@ -38,7 +40,7 @@ export async function createNewItem(formData: FormData) {
     const admin = await getAdminUser()
 
     const item = await prisma.item.create({
-      data: { name, quantity, unit, packUnit, packSize, boxUnit, boxSize, price }
+      data: { name, quantity, unit, packUnit, packSize, boxUnit, boxSize, packOnly, price }
     })
 
     await prisma.transaction.create({
@@ -123,6 +125,8 @@ export async function setItemUnit(formData: FormData) {
   const packSize = Math.max(1, Math.floor(Number(formData.get('packSize')) || 1))
   const boxUnit = formData.get('boxUnit')?.toString()?.trim() || 'karobka'
   const boxSize = Math.max(1, Math.floor(Number(formData.get('boxSize')) || 1))
+  // Chiqim faqat pachkada bo'lsin — pachkasi yo'q mahsulotda ma'nosiz
+  const packOnly = packSize > 1 && formData.get('packOnly') === 'on'
 
   if (!itemId) return { error: "Mahsulot tanlanmadi" }
   if (!name) return { error: "Nom bo'sh bo'lishi mumkin emas" }
@@ -139,7 +143,7 @@ export async function setItemUnit(formData: FormData) {
       }
     }
 
-    const data: any = { name, unit, packUnit, packSize, boxUnit, boxSize }
+    const data: any = { name, unit, packUnit, packSize, boxUnit, boxSize, packOnly }
 
     // Narx — faqat to'g'ri qiymat (bo'sh emas, son) kelganda yangilanadi
     const priceRaw = formData.get('price')

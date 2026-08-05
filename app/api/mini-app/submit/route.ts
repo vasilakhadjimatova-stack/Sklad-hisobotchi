@@ -46,7 +46,10 @@ export async function POST(req: NextRequest) {
       // Birlik konvertatsiyasi: zaxira HAR DOIM bazaviy birlikda (dona).
       // Foydalanuvchi pachka tanlasa, packSize ga ko'paytiramiz.
       const packSize = Math.max(1, item.packSize || 1)
-      const unitMode = entry.unitMode === 'pack' ? 'pack' : 'piece'
+      // "Faqat pachkada" belgilangan mahsulotda dona qabul qilinmaydi — eski
+      // mini-ilova nusxasi yoki ovozli kiritish 'piece' yuborsa ham pachkaga o'tadi.
+      const packOnly = packSize > 1 && item.packOnly
+      const unitMode = packOnly || entry.unitMode === 'pack' ? 'pack' : 'piece'
       const baseQty = unitMode === 'pack'
         ? Math.round((entry.quantity || 0) * packSize)
         : Math.round(entry.quantity || 0)
