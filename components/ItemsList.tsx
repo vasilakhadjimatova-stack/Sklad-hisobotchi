@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { Edit3, Check, X, AlertTriangle, Trash2 } from 'lucide-react'
-import { adjustStock, deleteItem } from '@/app/actions'
+import { adjustStock, deleteItem, renameItem } from '@/app/actions'
 import Modal from './Modal'
 
 type Item = {
@@ -17,30 +17,72 @@ type Item = {
 
 export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
   const [editingItem, setEditingItem] = useState<Item | null>(null)
+  const [newName, setNewName] = useState<string>('')
   const [newQuantity, setNewQuantity] = useState<string>('')
   const [reason, setReason] = useState<string>('Inventarizatsiya tahriri')
   const [loading, setLoading] = useState(false)
   const [deletingItem, setDeletingItem] = useState<Item | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
+  const openEditor = (item: Item) => {
+    setEditingItem(item)
+    setNewName(item.name)
+    setNewQuantity(item.quantity.toString())
+    setReason('Inventarizatsiya tahriri')
+  }
+
+  // Nom va qoldiq alohida amallar: o'zgargani bo'yichagina yuboriladi,
+  // shunda faqat nom tuzatilganda tarixga keraksiz ADJUST yozuvi tushmaydi.
   const handleAdjust = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingItem) return
-    
-    setLoading(true)
-    try {
-      const formData = new FormData()
-      formData.append('itemId', editingItem.id)
-      formData.append('quantity', newQuantity)
-      formData.append('reason', reason)
 
-      const result = await adjustStock(formData)
-      if (result.success) {
-        setEditingItem(null)
-        window.location.reload()
-      } else {
-        alert(result.error || "Xatolik yuz berdi")
+    const name = newName.trim()
+    if (!name) {
+      alert("Nom bo'sh bo'lishi mumkin emas")
+      return
+    }
+
+    const quantity = Number(newQuantity)
+    if (isNaN(quantity) || quantity < 0) {
+      alert("Qoldiq soni noto'g'ri")
+      return
+    }
+
+    setLoading(true)
+    let applied = false
+
+    // Bir amal muvaffaqiyatli bo'lib, ikkinchisi xato bersa ham ro'yxatni
+    // yangilaymiz — aks holda saqlangan o'zgarish ekranda ko'rinmay qoladi.
+    const fail = (message?: string) => {
+      alert(message || "Xatolik yuz berdi")
+      if (applied) window.location.reload()
+    }
+
+    try {
+      if (name !== editingItem.name) {
+        const formData = new FormData()
+        formData.append('itemId', editingItem.id)
+        formData.append('name', name)
+
+        const result = await renameItem(formData)
+        if (!result.success) return fail(result.error)
+        applied = true
       }
+
+      if (quantity !== editingItem.quantity) {
+        const formData = new FormData()
+        formData.append('itemId', editingItem.id)
+        formData.append('quantity', newQuantity)
+        formData.append('reason', reason)
+
+        const result = await adjustStock(formData)
+        if (!result.success) return fail(result.error)
+        applied = true
+      }
+
+      setEditingItem(null)
+      if (applied) window.location.reload()
     } catch (err) {
       alert("Aloqa xatosi")
     } finally {
@@ -113,8 +155,7 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
-                      setEditingItem(item)
-                      setNewQuantity(item.quantity.toString())
+                      openEditor(item)
                     }}
                     className="px-4 py-2 rounded-xl bg-white/40 text-zinc-900/60 hover:bg-brand-500/20 hover:text-brand-400 transition-all border border-white/60 inline-flex items-center gap-2 text-xs font-bold relative z-10"
                   >
@@ -147,7 +188,7 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
           <div className="glass-card w-full max-w-md rounded-[2.5rem] border border-white/60 shadow-2xl relative z-[10000] overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-8 border-b border-white/60 flex justify-between items-center bg-white/40">
               <div>
-                <h3 className="text-xl font-black text-zinc-900 uppercase tracking-tight">Qoldiqni tuzatish</h3>
+                <h3 className="text-xl font-black text-zinc-900 uppercase tracking-tight">Mahsulotni tuzatish</h3>
                 <p className="text-zinc-900/40 text-xs mt-1">{editingItem.name}</p>
               </div>
               <button type="button" onClick={() => setEditingItem(null)} className="text-zinc-900/20 hover:text-zinc-900 transition-colors p-2">
@@ -164,14 +205,28 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
               </div>
 
               <div>
+                <label className="block text-zinc-900/40 text-[10px] font-bold uppercase tracking-widest mb-2 ml-1">Mahsulot Nomi</label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full bg-white/40 border border-white/60 rounded-2xl py-4 px-6 text-zinc-900 font-bold focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all"
+                />
+                <p className="text-[10px] text-zinc-900/30 mt-2 ml-1 font-medium">
+                  Nom o'zgarsa kirim/chiqim tarixi saqlanib qoladi.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-zinc-900/40 text-[10px] font-bold uppercase tracking-widest mb-2 ml-1">Yangi Qoldiq Soni</label>
                 <div className="relative">
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={newQuantity}
                     onChange={(e) => setNewQuantity(e.target.value)}
                     required
-                    autoFocus
                     className="w-full bg-white/10 border border-white/20 rounded-2xl py-4 px-6 text-zinc-900 font-black focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all text-2xl"
                   />
                   <span className="absolute right-6 top-1/2 -translate-y-1/2 text-zinc-900/20 font-bold uppercase text-xs">{editingItem.unit}</span>
@@ -179,7 +234,7 @@ export default function ItemsList({ initialItems }: { initialItems: Item[] }) {
               </div>
 
               <div>
-                <label className="block text-zinc-900/40 text-[10px] font-bold uppercase tracking-widest mb-2 ml-1">Sabab</label>
+                <label className="block text-zinc-900/40 text-[10px] font-bold uppercase tracking-widest mb-2 ml-1">Sabab (qoldiq o'zgarsa)</label>
                 <input 
                   type="text" 
                   value={reason}
