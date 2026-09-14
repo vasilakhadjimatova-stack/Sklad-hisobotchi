@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "prisma db push --skip-generate && node server.js",
+    "start": "node server.js",
     "lint": "next lint",
     "bot": "tsx bot/index.ts",
     "postinstall": "prisma generate"
