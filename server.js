@@ -61,9 +61,11 @@ const prismaBin = path.join(__dirname, 'node_modules', '.bin', 'prisma');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function pushSchema() {
+function pushSchema(verbose) {
   return new Promise((resolve) => {
-    const p = spawn(prismaBin, ['db', 'push', '--skip-generate'], { stdio: 'inherit' });
+    const p = spawn(prismaBin, ['db', 'push', '--skip-generate'], {
+      stdio: verbose ? 'inherit' : 'ignore',
+    });
     p.on('error', (err) => {
       console.error('[schema] prisma ishga tushmadi:', err.message);
       resolve(false);
@@ -82,25 +84,35 @@ async function syncSchema() {
   }
 
   const waits = [0, 5, 10, 20, 30, 60]; // soniya, oxirgisi takrorlanadi
-  for (let i = 1; i <= 30; i++) {
+
+  // Cheksiz urinamiz. Baza bir necha soat o'chiq tursa ham, u qaytgan zahoti
+  // sxema moslanadi va sayt qayta deploysiz o'ziga keladi. Ilgari 30 urinishdan
+  // (~26 daqiqa) keyin to'xtardi va undan uzoq uzilishda qo'lda deploy kerak edi.
+  for (let i = 1; ; i++) {
     const wait = waits[Math.min(i - 1, waits.length - 1)];
     if (wait) await sleep(wait * 1000);
 
-    console.log(`[schema] Baza sxemasini moslash, urinish ${i} -> ${dbTarget()}`);
-    if (await pushSchema()) {
-      console.log('[schema] Baza sxemasi mos.');
+    // Logni bosib ketmaslik uchun: birinchi 5 urinish to'liq, keyin har 10-si
+    // (ya'ni ~10 daqiqada bir marta). Qolganlari jim ishlaydi.
+    const verbose = i <= 5 || i % 10 === 0;
+
+    if (verbose) {
+      console.log(`[schema] Baza sxemasini moslash, urinish ${i} -> ${dbTarget()}`);
+    }
+    if (await pushSchema(verbose)) {
+      console.log(`[schema] Baza sxemasi mos (${i}-urinishda).`);
       return;
     }
-    console.error('[schema] Moslashtirib bo\'lmadi.');
+    if (verbose) console.error('[schema] Moslashtirib bo\'lmadi.');
 
     if (i === 5) {
       console.error(
-        "[schema] DIQQAT: sxema hali moslanmadi. Sahifalar xato berishi " +
-        'mumkin. Fonda urinishda davom etaman.'
+        '[schema] DIQQAT: baza javob bermayapti. Sayt ishlaydi, lekin ' +
+        "ma'lumot talab qiladigan sahifalar xato beradi. Baza qaytguncha " +
+        'fonda urinishda davom etaman.'
       );
     }
   }
-  console.error('[schema] Moslash to\'xtatildi — 30 urinish ham natija bermadi.');
 }
 
 syncSchema();
