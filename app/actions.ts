@@ -32,6 +32,10 @@ export async function createNewItem(formData: FormData) {
   const qtyPiece = Math.max(0, Math.floor(Number(formData.get('qtyPiece')) || 0))
   const quantity = qtyBox * boxSize * packSize + qtyPack * packSize + qtyPiece
 
+  // Boshlang'ich kirim sanasi — mahsulot bazaga kechroq kiritilsa, haqiqiy
+  // kelgan kuni yoziladi. Bo'sh bo'lsa hozirgi vaqt ishlatiladi.
+  const dateStr = formData.get('date')?.toString()
+
   if (!name || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri (Soni 0 dan katta bo'lishi kerak)" }
 
   try {
@@ -50,11 +54,15 @@ export async function createNewItem(formData: FormData) {
         itemId: item.id,
         quantity: quantity,
         type: 'ADD',
-        status: 'APPROVED'
+        status: 'APPROVED',
+        createdAt: resolveTxDate(dateStr),
       }
     })
 
     revalidatePath('/')
+    revalidatePath('/items')
+    revalidatePath('/history')
+    revalidatePath('/analytics')
     return { success: true }
   } catch (err) {
     console.error(err)
