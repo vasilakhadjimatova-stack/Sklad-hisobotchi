@@ -637,8 +637,8 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
 
         {activeTab === 'ADD' && (
           <>
-            <div className="flex flex-col sm:flex-row gap-5 items-end">
-              <div className="flex-1 w-full">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-5 items-end">
+              <div className="flex-1 w-full sm:min-w-[220px]">
                 <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">Katalogdan tanlang</label>
                 <CatalogModal
                   items={items}
@@ -646,6 +646,24 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                   onSelect={setSelectedItem}
                   selectedItem={selectedItem}
                 />
+              </div>
+              <div className="w-full sm:w-48">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
+                  <Calendar size={13} className="text-zinc-900/40" /> Kirim sanasi
+                </label>
+                <input
+                  type="date"
+                  name="date"
+                  value={addDateField}
+                  onChange={(e) => setAddDateField(e.target.value)}
+                  max={todayField || undefined}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner"
+                />
+                {addDateField && todayField && addDateField !== todayField && (
+                  <p className="mt-1.5 text-[11px] font-semibold text-brand-600">
+                    O'tgan sana — tarixga shu kun bilan yoziladi
+                  </p>
+                )}
               </div>
               <div className="w-full sm:w-60">
                 <label className="block text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
@@ -731,24 +749,6 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                 {addPriceRaw > 0 && ((addPriceMode === 'pack' && addHasPack) || (addPriceMode === 'box' && addHasBox)) && (
                   <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">
                     = {fmtSom(addPricePerDona)} so'm / {selectedItem?.unit || 'dona'} · (1 {addPriceMode === 'box' ? (selectedItem?.boxUnit || 'karobka') : (selectedItem?.packUnit || 'pachka')} = {addPriceMode === 'box' ? addDonaPerBox : addPackSize} {selectedItem?.unit || 'dona'})
-                  </p>
-                )}
-              </div>
-              <div className="w-full sm:w-44">
-                <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
-                  <Calendar size={13} className="text-zinc-900/40" /> Kirim sanasi
-                </label>
-                <input
-                  type="date"
-                  name="date"
-                  value={addDateField}
-                  onChange={(e) => setAddDateField(e.target.value)}
-                  max={todayField || undefined}
-                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner"
-                />
-                {addDateField && todayField && addDateField !== todayField && (
-                  <p className="mt-1.5 text-[11px] font-semibold text-brand-600">
-                    O'tgan sana — tarixga shu kun bilan yoziladi
                   </p>
                 )}
               </div>
