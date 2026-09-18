@@ -199,6 +199,8 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   // Bo'sh boshlanadi va mount'dan keyin bugungi kunga qo'yiladi: server va brauzer
   // sanasi farq qilsa hydration ogohlantirishi chiqmasin.
   const [addDateField, setAddDateField] = useState('')
+  // Yangi mahsulotning boshlang'ich kirim sanasi
+  const [newDateField, setNewDateField] = useState('')
   const [todayField, setTodayField] = useState('')
   // Yangi mahsulot: narx + boshlang'ich miqdor (katta pachka)
   const [qtyBoxField, setQtyBoxField] = useState('')
@@ -214,6 +216,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     const t = todayStr()
     setTodayField(t)
     setAddDateField(t)
+    setNewDateField(t)
   }, [])
 
   const resetUnitFields = () => {
@@ -233,6 +236,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     setAddPriceField('')
     setAddPriceMode('piece')
     setAddDateField(todayStr())
+    setNewDateField(todayStr())
     setNewPriceField('')
     setNewPriceMode('piece')
   }
@@ -507,6 +511,19 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
             className="w-full px-5 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 placeholder-white/20 focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-inner text-center"
           />
           <span className="block mt-1.5 text-[11px] text-zinc-900/50 font-semibold text-center uppercase tracking-wider">{unitField || 'dona'}</span>
+        </div>
+        <div className="w-44">
+          <input
+            type="date"
+            name="date"
+            value={newDateField}
+            onChange={(e) => setNewDateField(e.target.value)}
+            max={todayField || undefined}
+            className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner text-center"
+          />
+          <span className="flex items-center justify-center gap-1 mt-1.5 text-[11px] text-zinc-900/50 font-semibold uppercase tracking-wider">
+            <Calendar size={11} className="text-zinc-900/40" /> kirim sanasi
+          </span>
         </div>
         {hasPack && (
           <div className="flex-1 min-w-[150px] flex items-center pt-1">
