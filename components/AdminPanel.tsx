@@ -2,7 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react'
 import { createNewItem, addStock, setItemUnit } from '@/app/actions'
-import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2 } from 'lucide-react'
+import { PlusCircle, ArrowDownCircle, Search, X, PackageOpen, Check, Settings2, Calendar } from 'lucide-react'
 import Modal from './Modal'
 
 type AdminItem = { id: string, name: string, unit?: string, packUnit?: string, packSize?: number, price?: number, quantity?: number, boxUnit?: string, boxSize?: number, packOnly?: boolean }
@@ -195,10 +195,26 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
   const [addQtyMode, setAddQtyMode] = useState<'piece' | 'pack' | 'box'>('piece')
   const [addPriceField, setAddPriceField] = useState('')
   const [addPriceMode, setAddPriceMode] = useState<'piece' | 'pack' | 'box'>('piece')
+  // Kirim sanasi — mahsulot kechroq kiritilsa, haqiqiy kelgan kunini belgilash uchun.
+  // Bo'sh boshlanadi va mount'dan keyin bugungi kunga qo'yiladi: server va brauzer
+  // sanasi farq qilsa hydration ogohlantirishi chiqmasin.
+  const [addDateField, setAddDateField] = useState('')
+  const [todayField, setTodayField] = useState('')
   // Yangi mahsulot: narx + boshlang'ich miqdor (katta pachka)
   const [qtyBoxField, setQtyBoxField] = useState('')
   const [newPriceField, setNewPriceField] = useState('')
   const [newPriceMode, setNewPriceMode] = useState<'piece' | 'pack' | 'box'>('piece')
+
+  const todayStr = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
+  useEffect(() => {
+    const t = todayStr()
+    setTodayField(t)
+    setAddDateField(t)
+  }, [])
 
   const resetUnitFields = () => {
     setNameField('')
@@ -216,6 +232,7 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
     setAddQtyMode('piece')
     setAddPriceField('')
     setAddPriceMode('piece')
+    setAddDateField(todayStr())
     setNewPriceField('')
     setNewPriceMode('piece')
   }
@@ -714,6 +731,24 @@ export default function AdminPanel({ items }: { items: AdminItem[] }) {
                 {addPriceRaw > 0 && ((addPriceMode === 'pack' && addHasPack) || (addPriceMode === 'box' && addHasBox)) && (
                   <p className="mt-1.5 text-[11px] font-semibold text-emerald-600">
                     = {fmtSom(addPricePerDona)} so'm / {selectedItem?.unit || 'dona'} · (1 {addPriceMode === 'box' ? (selectedItem?.boxUnit || 'karobka') : (selectedItem?.packUnit || 'pachka')} = {addPriceMode === 'box' ? addDonaPerBox : addPackSize} {selectedItem?.unit || 'dona'})
+                  </p>
+                )}
+              </div>
+              <div className="w-full sm:w-44">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900/60 uppercase tracking-wider mb-2">
+                  <Calendar size={13} className="text-zinc-900/40" /> Kirim sanasi
+                </label>
+                <input
+                  type="date"
+                  name="date"
+                  value={addDateField}
+                  onChange={(e) => setAddDateField(e.target.value)}
+                  max={todayField || undefined}
+                  className="w-full px-4 py-3 rounded-xl bg-white/50 border border-white/60 text-zinc-900 focus:border-brand-500/50 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all shadow-inner"
+                />
+                {addDateField && todayField && addDateField !== todayField && (
+                  <p className="mt-1.5 text-[11px] font-semibold text-brand-600">
+                    O'tgan sana — tarixga shu kun bilan yoziladi
                   </p>
                 )}
               </div>

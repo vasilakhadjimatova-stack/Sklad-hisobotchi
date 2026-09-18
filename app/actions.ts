@@ -2,6 +2,7 @@
 
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache'
+import { resolveTxDate } from '@/lib/date'
 
 async function getAdminUser() {
   const telegramId = "admin_dashboard_user"
@@ -70,6 +71,10 @@ export async function addStock(formData: FormData) {
   const hasPrice = priceRaw !== null && priceRaw.toString().trim() !== '' && !isNaN(Number(priceRaw))
   const incomingPrice = hasPrice ? Math.max(0, Number(priceRaw)) : null
 
+  // Kirim sanasi — mahsulot ombor bazasiga kechroq kiritilsa, haqiqiy
+  // kelgan kuni yoziladi. Bo'sh bo'lsa hozirgi vaqt ishlatiladi.
+  const dateStr = formData.get('date')?.toString()
+
   if (!itemId || isNaN(quantity) || quantity <= 0) return { error: "Ma'lumotlar noto'g'ri" }
 
   try {
@@ -102,10 +107,13 @@ export async function addStock(formData: FormData) {
         status: 'APPROVED',
         // Xarid narxi tarixi (kelgan narx × miqdor)
         totalPrice: incomingPrice !== null ? quantity * incomingPrice : null,
+        createdAt: resolveTxDate(dateStr),
       }
     })
 
     revalidatePath('/')
+    revalidatePath('/history')
+    revalidatePath('/analytics')
     return { success: true }
   } catch (err) {
     console.error(err)
