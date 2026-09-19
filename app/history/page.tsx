@@ -1,11 +1,42 @@
 import prisma from '@/lib/prisma';
-import { History, User as UserIcon, Package, ArrowUpRight, ArrowDownLeft, Settings2 } from 'lucide-react'
+import Link from 'next/link'
+import { History, User as UserIcon, Package, ArrowUpRight, ArrowDownLeft, Settings2, Calendar } from 'lucide-react'
 import { formatQty } from '@/lib/units'
 
 export const revalidate = 0
 
-export default async function HistoryPage() {
+// Juda katta sahifa yasab qo'ymaslik uchun yuqori chegara. Yetib borilsa,
+// foydalanuvchiga aytiladi — jimgina kesib tashlanmaydi.
+const MAX_ROWS = 5000
+
+// YYYY-MM-DD (Toshkent kuni) -> o'sha kunning boshlanish UTC instanti
+function dayStartUtc(ymd: string) {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, -5, 0, 0))
+}
+
+const ymd = (d: Date) => d.toISOString().slice(0, 10)
+
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams: { from?: string }
+}) {
+  // Toshkent bugungi kuni (UTC+5)
+  const nowTashkent = new Date(Date.now() + 5 * 60 * 60 * 1000)
+  const ty = nowTashkent.getUTCFullYear()
+  const tm = nowTashkent.getUTCMonth()
+
+  const thisMonthFrom = ymd(new Date(Date.UTC(ty, tm, 1)))
+  const prevMonthFrom = ymd(new Date(Date.UTC(ty, tm - 1, 1)))   // standart: o'tgan oy boshidan
+  const days90From = ymd(new Date(nowTashkent.getTime() - 90 * 24 * 60 * 60 * 1000))
+
+  const raw = searchParams.from
+  const showAll = raw === 'all'
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(raw || '') ? (raw as string) : prevMonthFrom
+
   const transactions = await prisma.transaction.findMany({
+    where: showAll ? {} : { createdAt: { gte: dayStartUtc(from) } },
     include: {
       item: true,
       user: true
@@ -13,8 +44,17 @@ export default async function HistoryPage() {
     orderBy: {
       createdAt: 'desc'
     },
-    take: 100 // Last 100 actions
+    take: MAX_ROWS,
   })
+
+  const truncated = transactions.length === MAX_ROWS
+
+  const quick = [
+    { label: 'Bu oy', href: `/history?from=${thisMonthFrom}`, active: !showAll && from === thisMonthFrom },
+    { label: "O'tgan oydan", href: `/history?from=${prevMonthFrom}`, active: !showAll && from === prevMonthFrom },
+    { label: '90 kun', href: `/history?from=${days90From}`, active: !showAll && from === days90From },
+    { label: 'Hammasi', href: '/history?from=all', active: showAll },
+  ]
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto min-h-full">
@@ -28,13 +68,61 @@ export default async function HistoryPage() {
         <p className="text-zinc-900/50 text-sm mt-2">Ombordagi barcha harakatlar (kirim, chiqim, tuzatish) loglari</p>
       </header>
 
+      {/* Davr tanlash — tarix bazada to'liq saqlanadi, bu faqat ko'rsatish oralig'i */}
+      <div className="glass-card rounded-3xl border border-white/60 shadow-xl p-5 mb-6 flex flex-col lg:flex-row lg:items-end gap-5">
+        <form method="get" className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="flex items-center gap-1.5 text-[10px] font-black text-zinc-900/40 uppercase tracking-widest mb-2">
+              <Calendar size={12} /> Shu sanadan boshlab
+            </label>
+            <input
+              type="date"
+              name="from"
+              defaultValue={showAll ? '' : from}
+              max={ymd(nowTashkent)}
+              className="px-4 py-2.5 rounded-xl bg-white/60 border border-white/70 text-zinc-900 font-bold text-sm focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none shadow-inner"
+            />
+          </div>
+          <button
+            type="submit"
+            className="px-5 py-2.5 rounded-xl bg-violet-500 text-white font-black text-xs uppercase tracking-widest hover:bg-violet-600 transition-colors shadow-lg shadow-violet-500/20"
+          >
+            Ko'rsatish
+          </button>
+        </form>
+
+        <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+          {quick.map((q) => (
+            <Link
+              key={q.href}
+              href={q.href}
+              className={`px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                q.active
+                  ? 'bg-violet-500 text-white border-violet-500'
+                  : 'bg-white/50 text-zinc-900/60 border-white/70 hover:bg-white/80'
+              }`}
+            >
+              {q.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {truncated && (
+        <div className="mb-6 px-5 py-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-sm font-medium text-amber-700">
+          Juda ko'p yozuv — faqat oxirgi {MAX_ROWS} tasi ko'rsatildi. Qolganini ko'rish uchun boshlanish sanasini keyinroq qilib qo'ying.
+        </div>
+      )}
+
       <div className="glass-card rounded-[2.5rem] overflow-hidden border border-white/60 shadow-2xl bg-white/[0.01]">
         <div className="p-8 border-b border-white/60 flex items-center justify-between bg-white/40">
           <div className="flex items-center gap-3">
             <Settings2 size={20} className="text-zinc-900/20" />
             <span className="font-black text-zinc-900/90 uppercase tracking-widest text-sm">Audit Log</span>
           </div>
-          <span className="text-[10px] font-black text-zinc-900/20 uppercase tracking-[0.3em]">Barcha foydalanuvchilar harakati</span>
+          <span className="text-[10px] font-black text-zinc-900/30 uppercase tracking-[0.2em]">
+            {showAll ? 'Butun tarix' : `${from} dan buyon`} · {transactions.length} ta yozuv
+          </span>
         </div>
 
         <div className="overflow-x-auto">
@@ -103,6 +191,11 @@ export default async function HistoryPage() {
               })}
             </tbody>
           </table>
+          {transactions.length === 0 && (
+            <div className="p-12 text-center text-zinc-900/30 font-medium">
+              Bu davrda yozuv yo'q. Boshlanish sanasini oldinroq qilib ko'ring.
+            </div>
+          )}
         </div>
       </div>
     </div>
