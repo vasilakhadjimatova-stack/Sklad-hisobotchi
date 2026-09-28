@@ -13,7 +13,8 @@
 
 export type ErpEvent = {
   id: number
-  name: string
+  name: string        // ERP kalendaridagi nom (mijoz nomi)
+  type?: string       // tadbir turi, masalan «Seminar» (eski ERP'da yo'q)
   date: string        // YYYY-MM-DD (Toshkent kuni)
   start_time: string  // HH:MM
   end_time: string
