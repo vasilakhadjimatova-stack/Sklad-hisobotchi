@@ -38,7 +38,8 @@ export type EventEntry = {
 // ERP kalendaridagi tadbir + unga shu paytgacha nima olingani (server jamlaydi)
 export type EventCard = {
   id: number
-  name: string
+  name: string        // kalendardagi nom (mijoz)
+  type?: string       // tadbir turi
   date: string        // YYYY-MM-DD
   start_time: string
   end_time: string
@@ -575,6 +576,9 @@ export default function MiniAppClient({
               <Clock size={12} /> {timeRange(ev)}
             </div>
             <div className="mt-0.5 text-[17px] font-extrabold text-zinc-900 leading-snug break-words">{ev.name}</div>
+            {ev.type && ev.type !== ev.name && (
+              <div className="text-xs font-semibold text-zinc-500 break-words">{ev.type}</div>
+            )}
             {(ev.hall || ev.guests > 0) && (
               <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs font-medium text-zinc-500">
                 {ev.hall && <span className="flex items-center gap-1"><MapPin size={11} />{ev.hall}</span>}
