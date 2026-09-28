@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache'
 import { resolveTxDate } from '@/lib/date'
+import { isPriced, unitPriceOf } from '@/lib/reprice'
 
 async function getAdminUser() {
   const telegramId = "admin_dashboard_user"
@@ -281,5 +282,48 @@ export async function adjustStock(formData: FormData) {
   } catch (err) {
     console.error(err)
     return { error: "Xatolik yuz berdi" }
+  }
+}
+
+// Eski chiqimlarni hozirgi narxga o'tkazish ("Narxlarni tuzatish" sahifasi).
+// Faqat tanlangan 1 dona narxlaridagi chiqimlar (TAKE) qayta hisoblanadi:
+// totalPrice = miqdor × hozirgi narx. Zaxira (qoldiq) va miqdor tegmaydi.
+export async function repriceTakes(itemId: string, unitPrices: number[]) {
+  if (!itemId) return { error: "Mahsulot tanlanmadi" }
+  const wanted = new Set(unitPrices.filter(n => Number.isFinite(n)).map(n => Math.round(n)))
+  if (wanted.size === 0) return { error: "Qaysi narxdagi chiqimlarni tuzatishni tanlang" }
+
+  try {
+    const item = await prisma.item.findUnique({ where: { id: itemId } })
+    if (!item) return { error: "Mahsulot topilmadi" }
+    if (!(item.price > 0)) return { error: "Avval mahsulotga to'g'ri narx qo'ying" }
+
+    const takes = await prisma.transaction.findMany({
+      where: { itemId, type: 'TAKE', totalPrice: { gt: 0 } },
+      select: { id: true, quantity: true, totalPrice: true },
+    })
+    const targets = takes.filter(t => isPriced(t) && wanted.has(unitPriceOf(t)))
+    if (targets.length === 0) return { error: "Bu narxdagi chiqim topilmadi (allaqachon tuzatilgan bo'lishi mumkin)" }
+
+    let before = 0
+    let after = 0
+    const updates = targets.map(t => {
+      const total = Math.abs(t.quantity) * item.price
+      before += t.totalPrice || 0
+      after += total
+      return prisma.transaction.update({ where: { id: t.id }, data: { totalPrice: total } })
+    })
+    for (let i = 0; i < updates.length; i += 200) {
+      await prisma.$transaction(updates.slice(i, i + 200))
+    }
+
+    revalidatePath('/narxlar')
+    revalidatePath('/analytics')
+    revalidatePath('/history')
+    revalidatePath('/mini-app')
+    return { success: true, count: targets.length, before: Math.round(before), after: Math.round(after) }
+  } catch (err) {
+    console.error('repriceTakes:', err)
+    return { error: "Narxni tuzatib bo'lmadi. Qaytadan urinib ko'ring." }
   }
 }
