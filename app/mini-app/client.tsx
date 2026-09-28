@@ -309,7 +309,7 @@ export default function MiniAppClient({
     window.scrollTo(0, 0)
   }
 
-  const openSheet = (target: Target, mode: Mode = 'TAKE') => {
+  const openSheet = (target: Target, mode: Mode = 'TAKE', otherPreset = '') => {
     // Ism yozilgan-u hali tasdiqlanmagan bo'lsa — shu yerda tasdiqlaymiz
     if (needName && !saveName()) {
       setNameNudge(true)
@@ -321,7 +321,7 @@ export default function MiniAppClient({
     setVoiceMsg('')
     setSheetError('')
     if (target.kind === 'other') {
-      setOtherName('')
+      setOtherName(otherPreset)
       setOtherDate(todayLocal())
     }
     setSheet({ target, mode })
@@ -700,12 +700,28 @@ export default function MiniAppClient({
     </nav>
   )
 
+  // Impulse (kompaniyaning o'z ehtiyoji) — kalendarda yo'q, lekin har kuni
+  // kerak bo'ladi. Pastki o'ng burchakda doim turadi, bir bosishda ochiladi.
+  const renderImpulseTile = () => (
+    <button
+      onClick={() => openSheet({ kind: 'other' }, 'TAKE', 'Impulse')}
+      aria-label="Impulse — chiqim qo'shish"
+      className="fixed right-4 z-30 flex items-center gap-2 rounded-2xl bg-white border border-zinc-200 shadow-lg shadow-zinc-900/10 pl-3.5 pr-1.5 py-1.5 active:scale-95 transition-transform"
+      style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)' }}
+    >
+      <span className="text-sm font-extrabold text-zinc-900">Impulse</span>
+      <span className="w-8 h-8 rounded-xl bg-brand-500 text-white flex items-center justify-center">
+        <Plus size={18} strokeWidth={2.75} />
+      </span>
+    </button>
+  )
+
   // ════════════════════════════════════════════════════════════════
   //  Sahifa
   // ════════════════════════════════════════════════════════════════
 
   return (
-    <div className="min-h-screen bg-[#f4f5f9] text-zinc-900 font-sans pb-24">
+    <div className="min-h-screen bg-[#f4f5f9] text-zinc-900 font-sans pb-40">
 
       {toast && (
         <div
@@ -787,7 +803,7 @@ export default function MiniAppClient({
             >
               <div className="flex-1">
                 <div className="font-extrabold text-[15px]">Boshqa ehtiyoj</div>
-                <div className="text-xs font-medium text-zinc-500">Impulse, ofis, kalendarda yo'q tadbir</div>
+                <div className="text-xs font-medium text-zinc-500">Ofis, kalendarda yo'q tadbir</div>
               </div>
               <span className="w-10 h-10 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-brand-600">
                 <Plus size={20} strokeWidth={2.5} />
@@ -995,6 +1011,7 @@ export default function MiniAppClient({
         )}
       </div>
 
+      {view !== 'event' && !sheet && renderImpulseTile()}
       {renderTabBar()}
 
       {/* ══════════ MAHSULOT OYNASI ══════════ */}
@@ -1010,7 +1027,7 @@ export default function MiniAppClient({
               {/* Qaysi tadbirga yozilayotgani — to'liq ko'rinsin, kesilmasin */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 pt-1 text-sm font-bold text-brand-600 leading-snug break-words">
-                  {sheetEvent ? `${sheetEvent.name} · ${sheetEvent.start_time}` : 'Boshqa ehtiyoj'}
+                  {sheetEvent ? `${sheetEvent.name} · ${sheetEvent.start_time}` : otherName === 'Impulse' ? 'Impulse' : 'Boshqa ehtiyoj'}
                 </div>
                 <button onClick={closeSheet} aria-label="Yopish" className="shrink-0 w-9 h-9 rounded-xl bg-zinc-100 flex items-center justify-center text-zinc-500">
                   <X size={18} />
