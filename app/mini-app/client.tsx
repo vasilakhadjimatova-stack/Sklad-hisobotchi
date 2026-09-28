@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft, Mic, History, RotateCcw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Package, ChevronRight, Check, AlertCircle, Minus, Plus, Search, Calendar, ArrowLeft, Mic, History, RotateCcw, Clock, MapPin, Users } from 'lucide-react'
 
 type Item = {
   id: string
@@ -40,7 +41,31 @@ const maxFor = (it: Item, mode: UnitMode) =>
     ? Math.floor((it.quantity || 0) / Math.max(1, it.packSize || 1))
     : (it.quantity || 0)
 
-type Step = 'event' | 'items' | 'confirm' | 'done' | 'error' | 'history'
+type Step = 'event' | 'eventDetail' | 'items' | 'confirm' | 'done' | 'error' | 'history'
+
+// ERP kalendaridagi tadbir + unga shu paytgacha nima olingani (server jamlaydi)
+export type EventCard = {
+  id: number
+  name: string
+  date: string        // YYYY-MM-DD
+  start_time: string
+  end_time: string
+  hall: string
+  guests: number
+  status: string
+  isToday: boolean
+  lines: { name: string; taken: string; returned: string }[]
+  takenValue: number
+  lastAt: string | null   // oxirgi chiqim vaqti (HH:MM)
+}
+
+// Brauzerning bugungi sanasi (YYYY-MM-DD)
+const todayLocal = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const fmtSum = (n: number) => `${Math.round(n).toLocaleString('ru-RU')} so'm`
 
 const cyrillicToLatinMap: Record<string, string> = {
   'а':'a', 'б':'b', 'в':'v', 'г':'g', 'д':'d', 'е':'e', 'ё':'yo', 'ж':'j', 'з':'z',
@@ -121,10 +146,24 @@ declare global {
   }
 }
 
-export default function MiniAppClient({ items, recentEvents = [] }: { items: Item[], recentEvents?: string[] }) {
+export default function MiniAppClient({
+  items,
+  recentEvents = [],
+  eventCards = [],
+  erpStatus = 'off',
+}: {
+  items: Item[]
+  recentEvents?: string[]
+  eventCards?: EventCard[]
+  erpStatus?: 'ok' | 'off' | 'error'
+}) {
+  const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [actionType, setActionType] = useState<'TAKE' | 'ADD'>('TAKE')
   const [step, setStep] = useState<Step>('event')
+  // Tadbir kartochkasidan kirilgan bo'lsa — ERP tadbir id'si. Kartochka
+  // ma'lumoti props'dan olinadi, shunda router.refresh() dan keyin yangilanadi.
+  const [activeEventId, setActiveEventId] = useState<number | null>(null)
   const [eventName, setEventName] = useState('')
   const [selected, setSelected] = useState<SelectedItem[]>([])
   const [search, setSearch] = useState('')
@@ -181,6 +220,75 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
   const userId = tgUser?.id || (manualName.trim()
     ? `web_${manualName.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}`
     : 'web_guest')
+
+  const activeEvent = activeEventId !== null
+    ? eventCards.find(e => e.id === activeEventId) ?? null
+    : null
+  const todayCards = eventCards.filter(e => e.isToday)
+  const yesterdayCards = eventCards.filter(e => !e.isToday)
+  const needName = !tgUser && !manualName.trim()
+
+  const openEvent = (ev: EventCard) => {
+    setActiveEventId(ev.id)
+    setStep('eventDetail')
+  }
+
+  // Bosh sahifaga — kartochka tanlovini va uning sanasini tozalaymiz
+  const goHome = () => {
+    setActiveEventId(null)
+    setSelected([])
+    setSearch('')
+    setEventName('')
+    setSelectedDate(todayLocal())
+    setStep('event')
+  }
+
+  // Kartochkadan chiqim/qaytarish: tadbir nomi va SANASI avtomatik —
+  // kechagi tadbirga ertasi kuni yozilsa ham o'z kuniga tushadi.
+  const startForEvent = (ev: EventCard, type: 'TAKE' | 'ADD') => {
+    if (needName) return
+    if (!tgUser && manualName.trim()) localStorage.setItem('sklad_user_name', manualName.trim())
+    setActionType(type)
+    setEventName(ev.name)
+    setSelectedDate(ev.date)
+    setSelected([])
+    setSearch('')
+    setStep('items')
+  }
+
+  const renderEventCard = (ev: EventCard) => {
+    const empty = ev.lines.length === 0
+    return (
+      <button
+        key={ev.id}
+        onClick={() => openEvent(ev)}
+        className="w-full text-left bg-white/80 backdrop-blur-md border border-white/90 rounded-3xl p-5 shadow-sm active:scale-[0.98] transition-all"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-brand-600">
+              <Clock size={13} /> {ev.start_time}{ev.end_time ? `–${ev.end_time}` : ''}
+            </div>
+            <div className="mt-1 text-lg font-black text-zinc-900 leading-tight break-words">{ev.name}</div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-zinc-500">
+              {ev.hall && <span className="flex items-center gap-1"><MapPin size={12} />{ev.hall}</span>}
+              {ev.guests > 0 && <span className="flex items-center gap-1"><Users size={12} />{ev.guests} kishi</span>}
+            </div>
+          </div>
+          <ChevronRight size={20} className="text-zinc-300 shrink-0 mt-1" />
+        </div>
+        <div className={`mt-4 px-3.5 py-2.5 rounded-2xl text-xs font-bold border ${
+          empty
+            ? 'bg-amber-500/10 text-amber-700 border-amber-500/20'
+            : 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20'
+        }`}>
+          {empty
+            ? "Hali chiqim qilinmagan — bosib qo'shing"
+            : `${ev.lines.length} xil mahsulot olingan${ev.lastAt ? ` · oxirgisi ${ev.lastAt}` : ''}`}
+        </div>
+      </button>
+    )
+  }
 
   // Tadbir tugmalari: "Impulse" doim + oxirgi kiritilgan nomlar (bazadan)
   const eventPresets = ['Impulse', ...recentEvents
@@ -364,6 +472,7 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
           telegramId: userId,
           telegramName: displayName,
           date: selectedDate,
+          erpEventId: activeEventId,
           items: selected.map(s => ({
             itemId: s.item.id,
             quantity: s.qty,
@@ -375,7 +484,19 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
       const data = await res.json()
       if (data.success) {
         setStep('done')
-        setTimeout(() => window.Telegram?.WebApp?.close(), 2500)
+        if (activeEventId !== null) {
+          // Tadbir kartochkasidan: oyna yopilmaydi — kartochkaga qaytamiz va
+          // ro'yxatni yangilaymiz, kun bo'yi yana qo'shish bir bosishda bo'lsin.
+          router.refresh()
+          setTimeout(() => {
+            setSelected([])
+            setSearch('')
+            setActionType('TAKE')
+            setStep('eventDetail')
+          }, 1400)
+        } else {
+          setTimeout(() => window.Telegram?.WebApp?.close(), 2500)
+        }
       } else {
         setErrorMsg(data.error || 'Xatolik yuz berdi')
         setStep('error')
@@ -402,9 +523,13 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
         {/* Header */}
         <div className="sticky top-0 z-30 bg-white/60 backdrop-blur-xl border-b border-white/80 shadow-sm px-5 py-4">
           <div className="flex items-center gap-3">
-            {(step === 'items' || step === 'confirm') && (
+            {(step === 'eventDetail' || step === 'items' || step === 'confirm') && (
               <button
-                onClick={() => setStep(step === 'confirm' ? 'items' : 'event')}
+                onClick={() => {
+                  if (step === 'confirm') setStep('items')
+                  else if (step === 'items' && activeEvent) setStep('eventDetail')
+                  else goHome()
+                }}
                 aria-label="Orqaga"
                 className="w-10 h-10 rounded-xl bg-white/70 border border-white/80 shadow-sm flex items-center justify-center text-zinc-600 active:scale-95 transition-all shrink-0"
               >
@@ -426,7 +551,7 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
               <React.Fragment key={s}>
                 <div className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
                   step === 'done' ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' :
-                  ['event', 'items', 'confirm'].indexOf(step) >= i ? 'bg-brand-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-zinc-900/10'
+                  ['event', 'items', 'confirm'].indexOf(step === 'eventDetail' ? 'event' : step) >= i ? 'bg-brand-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]' : 'bg-zinc-900/10'
                 }`} />
               </React.Fragment>
             ))}
@@ -438,6 +563,40 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
           {/* STEP 1: Event Name */}
           {step === 'event' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              {/* ERP kalendaridagi tadbirlar — ochilganda birinchi ko'rinadigan narsa */}
+              {erpStatus !== 'off' && (
+                <div className="space-y-3">
+                  <div className="flex items-end justify-between">
+                    <h2 className="text-2xl font-bold text-zinc-900 tracking-tight">Bugungi tadbirlar</h2>
+                    {todayCards.length > 0 && (
+                      <span className="text-xs font-bold text-zinc-400">{todayCards.length} ta</span>
+                    )}
+                  </div>
+                  {todayCards.map(renderEventCard)}
+                  {erpStatus === 'ok' && todayCards.length === 0 && (
+                    <div className="text-sm font-medium text-zinc-500 bg-white/60 border border-white/80 rounded-2xl px-4 py-3">
+                      Bugun kalendarda tadbir yo'q.
+                    </div>
+                  )}
+                  {erpStatus === 'error' && (
+                    <div className="text-sm font-medium text-amber-700 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3">
+                      Kalendar yuklanmadi. Tadbirni pastda qo'lda tanlang.
+                    </div>
+                  )}
+                  {yesterdayCards.length > 0 && (
+                    <div className="pt-2 space-y-3">
+                      <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest ml-1">Kechagi tadbirlar</h3>
+                      {yesterdayCards.map(renderEventCard)}
+                    </div>
+                  )}
+                  <div className="pt-4 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-zinc-900/10" />
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest text-center">Boshqa tadbir yoki ichki ehtiyoj</span>
+                    <div className="h-px flex-1 bg-zinc-900/10" />
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={openHistory}
                 className="w-full py-3 rounded-2xl bg-white/60 border border-white/80 text-zinc-600 font-bold text-xs flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
@@ -548,6 +707,90 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
                 Davom etish <ChevronRight size={18} />
               </button>
             </div>
+          )}
+
+          {/* TADBIR KARTOCHKASI: nima olingan + chiqim qo'shish */}
+          {step === 'eventDetail' && (
+            activeEvent ? (
+              <div className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="bg-white/80 backdrop-blur-md border border-white/90 rounded-3xl p-5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-brand-600">
+                    <Clock size={13} /> {activeEvent.isToday ? 'Bugun' : 'Kecha'} · {activeEvent.start_time}{activeEvent.end_time ? `–${activeEvent.end_time}` : ''}
+                  </div>
+                  <h2 className="mt-1 text-2xl font-black text-zinc-900 leading-tight break-words">{activeEvent.name}</h2>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-zinc-500">
+                    {activeEvent.hall && <span className="flex items-center gap-1"><MapPin size={12} />{activeEvent.hall}</span>}
+                    {activeEvent.guests > 0 && <span className="flex items-center gap-1"><Users size={12} />{activeEvent.guests} kishi</span>}
+                  </div>
+                </div>
+
+                {needName && (
+                  <div className="space-y-2">
+                    <label className="block text-zinc-500 text-xs font-bold uppercase tracking-widest ml-1">Ismingiz</label>
+                    <input
+                      type="text"
+                      placeholder="Ismi familyangizni kiriting..."
+                      value={manualName}
+                      onChange={e => setManualName(e.target.value)}
+                      className="w-full bg-white/70 backdrop-blur-md border border-white/80 shadow-sm rounded-2xl py-4 px-5 text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 transition-all font-medium"
+                    />
+                  </div>
+                )}
+
+                <button
+                  onClick={() => startForEvent(activeEvent, 'TAKE')}
+                  disabled={needName}
+                  className="w-full py-5 rounded-2xl bg-gradient-to-r from-brand-500 to-violet-500 text-white font-black text-base uppercase tracking-widest disabled:opacity-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-[0_8px_20px_rgba(99,102,241,0.3)]"
+                >
+                  <Plus size={20} strokeWidth={3} /> Chiqim qo'shish
+                </button>
+
+                <div>
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest ml-1 mb-2">Olingan narsalar</h3>
+                  {activeEvent.lines.length === 0 ? (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-700 rounded-2xl px-4 py-4 text-sm font-medium">
+                      Bu tadbirga hali hech narsa chiqim qilinmagan.
+                    </div>
+                  ) : (
+                    <div className="bg-white/80 backdrop-blur-md border border-white/90 rounded-3xl shadow-sm divide-y divide-zinc-900/5">
+                      {activeEvent.lines.map(l => (
+                        <div key={l.name} className="px-4 py-3 flex items-start justify-between gap-3">
+                          <span className="font-bold text-zinc-800 text-sm break-words min-w-0">{l.name}</span>
+                          <span className="text-right shrink-0">
+                            {l.taken && <span className="block text-sm font-black text-brand-600">{l.taken}</span>}
+                            {l.returned && <span className="block text-[11px] font-bold text-emerald-600">{l.returned} qaytdi</span>}
+                          </span>
+                        </div>
+                      ))}
+                      {activeEvent.takenValue > 0 && (
+                        <div className="px-4 py-3 flex items-center justify-between text-sm">
+                          <span className="font-bold text-zinc-500">Jami chiqim</span>
+                          <span className="font-black text-zinc-900">{fmtSum(activeEvent.takenValue)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => startForEvent(activeEvent, 'ADD')}
+                  disabled={needName}
+                  className="w-full py-3.5 rounded-2xl bg-white/70 border border-white/90 text-emerald-700 font-bold text-sm disabled:opacity-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <RotateCcw size={16} /> Ortib qolganini qaytarish
+                </button>
+              </div>
+            ) : (
+              <div className="text-center py-16 space-y-4">
+                <p className="text-zinc-500 font-medium">Bu tadbir kalendardan topilmadi.</p>
+                <button
+                  onClick={goHome}
+                  className="px-6 py-3 rounded-2xl bg-white/70 border border-white/90 text-zinc-700 font-bold text-sm shadow-sm"
+                >
+                  Bosh sahifaga
+                </button>
+              </div>
+            )
           )}
 
           {/* STEP 2: Select Items */}
@@ -851,11 +1094,14 @@ export default function MiniAppClient({ items, recentEvents = [] }: { items: Ite
               </div>
               <h2 className="text-3xl font-black text-zinc-900 tracking-tight">Muvaffaqiyatli!</h2>
               <p className="text-zinc-500 font-medium text-base text-center leading-relaxed max-w-[250px]">
-                {actionType === 'TAKE' ? 'Chiqim' : 'Kirim'} saqlandi.{tgUser ? <><br />Oyna avtomatik yopiladi...</> : ''}
+                {actionType === 'TAKE' ? 'Chiqim' : 'Kirim'} saqlandi.
+                {activeEvent
+                  ? <><br />Tadbir kartochkasiga qaytilmoqda...</>
+                  : tgUser ? <><br />Oyna avtomatik yopiladi...</> : ''}
               </p>
-              {!tgUser && (
+              {!tgUser && !activeEvent && (
                 <button
-                  onClick={() => { setSelected([]); setSearch(''); setEventName(''); setStep('event') }}
+                  onClick={goHome}
                   className="mt-4 px-8 py-4 rounded-2xl bg-gradient-to-r from-brand-500 to-violet-500 text-white font-bold text-sm uppercase tracking-widest active:scale-[0.98] transition-all shadow-[0_8px_20px_rgba(99,102,241,0.3)]"
                 >
                   Yangi amal

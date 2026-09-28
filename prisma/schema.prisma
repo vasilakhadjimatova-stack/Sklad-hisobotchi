@@ -45,5 +45,11 @@ model Transaction {
   eventName  String?  // Qaysi tadbir uchun olingani
   totalPrice Float?   // quantity * item.price
   unitMode   String?  // "pack" | "piece" — chiqim qaysi birlikda kiritilgani
+  // ERP kalendaridagi tadbir (biz_events.id). Chiqim tadbir kartochkasidan
+  // qilinsa yoziladi — "shu tadbirga nima olindi" shu bo'yicha topiladi.
+  // Qo'lda yozilgan tadbir yoki ichki ehtiyoj uchun bo'sh qoladi.
+  erpEventId Int?
   createdAt  DateTime @default(now())
+
+  @@index([erpEventId])
 }
