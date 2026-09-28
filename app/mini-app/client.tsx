@@ -185,6 +185,7 @@ export default function MiniAppClient({
   // Mahsulot oynasi
   const [sheet, setSheet] = useState<{ target: Target; mode: Mode } | null>(null)
   const [basket, setBasket] = useState<SelectedItem[]>([])
+  const [qtyDraft, setQtyDraft] = useState<Record<string, string>>({})
   const [search, setSearch] = useState('')
   const [otherName, setOtherName] = useState('')
   const [otherDate, setOtherDate] = useState(todayLocal)
@@ -317,6 +318,7 @@ export default function MiniAppClient({
       return
     }
     setBasket([])
+    setQtyDraft({})
     setSearch('')
     setVoiceMsg('')
     setSheetError('')
@@ -350,6 +352,19 @@ export default function MiniAppClient({
       if (q <= 0) return []                       // 1 dan pastga — savatdan chiqadi
       return [{ ...s, qty: Math.min(capFor(s), q) }]
     }))
+  }
+  // Sonni qo'lda yozish. Yozilayotgan matn alohida saqlanadi — aks holda
+  // "1" ni o'chirib "25" yozmoqchi bo'lganda maydon bo'shab qololmasdi.
+  const setQtyTyped = (id: string, raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 6)
+    setQtyDraft(prev => ({ ...prev, [id]: digits }))
+    const n = Number(digits)
+    if (n > 0) {
+      setBasket(prev => prev.map(s => s.item.id !== id ? s : { ...s, qty: Math.min(capFor(s), n) }))
+    }
+  }
+  const endQtyTyping = (id: string) => {
+    setQtyDraft(prev => { const { [id]: _, ...rest } = prev; return rest })
   }
   const setUnit = (id: string, mode: UnitMode) => {
     setBasket(prev => prev.map(s =>
@@ -635,9 +650,26 @@ export default function MiniAppClient({
               >
                 <Minus size={16} strokeWidth={2.5} />
               </button>
-              <span className="min-w-[3.5rem] text-center font-extrabold text-zinc-900 text-sm tabular-nums leading-tight">
-                {s.qty}<span className="block text-[10px] font-bold text-zinc-500">{unitName(item, s.mode)}</span>
-              </span>
+              <label className="flex flex-col items-center leading-tight">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  enterKeyHint="done"
+                  value={qtyDraft[item.id] ?? String(s.qty)}
+                  onChange={e => setQtyTyped(item.id, e.target.value)}
+                  onFocus={e => e.target.select()}
+                  onBlur={() => endQtyTyping(item.id)}
+                  onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                  aria-label={`${item.name} — soni`}
+                  className="w-14 rounded-lg border border-zinc-200 bg-white py-1 text-center text-base font-extrabold text-zinc-900 tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500/40"
+                />
+                {Number(qtyDraft[item.id] || 0) > s.qty ? (
+                  <span className="text-[10px] font-bold text-rose-500">maks {s.qty}</span>
+                ) : (
+                  <span className="text-[10px] font-bold text-zinc-500">{unitName(item, s.mode)}</span>
+                )}
+              </label>
               <button
                 onClick={() => changeQty(item.id, 1)}
                 aria-label="Ko'paytirish"
