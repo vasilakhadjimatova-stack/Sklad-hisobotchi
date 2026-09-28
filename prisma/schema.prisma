@@ -19,12 +19,12 @@ model User {
 model Item {
   id           String        @id @default(cuid())
   name         String        @unique
-  quantity     Int           @default(0)   // zaxira HAR DOIM bazaviy birlikda (dona)
-  price        Float         @default(0)   // narx HAR DOIM 1 dona uchun
+  quantity     Int           @default(0) // zaxira HAR DOIM bazaviy birlikda (dona)
+  price        Float         @default(0) // narx HAR DOIM 1 dona uchun
   unit         String        @default("Dona") // bazaviy (dona) birlik nomi
-  packSize     Int           @default(1)   // 1 pachkada nechta dona (1 = pachka yo'q)
+  packSize     Int           @default(1) // 1 pachkada nechta dona (1 = pachka yo'q)
   packUnit     String        @default("pachka") // pachka birligi nomi
-  boxSize      Int           @default(1)   // 1 katta pachkada nechta pachka (1 = katta pachka yo'q)
+  boxSize      Int           @default(1) // 1 katta pachkada nechta pachka (1 = katta pachka yo'q)
   boxUnit      String        @default("karobka") // katta pachka birligi nomi
   packOnly     Boolean       @default(false) // chiqim faqat pachkada (dona tanlovi ko'rsatilmaydi)
   transactions Transaction[]
@@ -38,13 +38,13 @@ model Transaction {
   user       User     @relation(fields: [userId], references: [id])
   itemId     String
   item       Item     @relation(fields: [itemId], references: [id])
-  quantity   Int      // Pozitiv - qo'shish, negativ - olish
-  type       String   // 'TAKE', 'RETURN', 'ADD', 'ADJUST'
+  quantity   Int // Pozitiv - qo'shish, negativ - olish
+  type       String // 'TAKE', 'RETURN', 'ADD', 'ADJUST'
   status     String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  image      String?  // Rasm file_id
-  eventName  String?  // Qaysi tadbir uchun olingani
-  totalPrice Float?   // quantity * item.price
-  unitMode   String?  // "pack" | "piece" — chiqim qaysi birlikda kiritilgani
+  image      String? // Rasm file_id
+  eventName  String? // Qaysi tadbir uchun olingani
+  totalPrice Float? // quantity * item.price
+  unitMode   String? // "pack" | "piece" — chiqim qaysi birlikda kiritilgani
   // ERP kalendaridagi tadbir (biz_events.id). Chiqim tadbir kartochkasidan
   // qilinsa yoziladi — "shu tadbirga nima olindi" shu bo'yicha topiladi.
   // Qo'lda yozilgan tadbir yoki ichki ehtiyoj uchun bo'sh qoladi.
@@ -52,4 +52,13 @@ model Transaction {
   createdAt  DateTime @default(now())
 
   @@index([erpEventId])
+}
+
+// Tadbir tugaganda botdan yuborilgan eslatmalar. Yozuv — "bu tadbirga eslatma
+// allaqachon ketgan" belgisi: qayta deploy yoki ikki nusxa ishlasa ham
+// har bir tadbir uchun eslatma faqat bir marta boradi.
+model EventReminder {
+  erpEventId Int      @id
+  sentTo     Int      @default(0) // nechta xodimga yetib bordi
+  createdAt  DateTime @default(now())
 }
