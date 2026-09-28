@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
+import { startEventReminders } from './reminders';
 
 // Load .env
 dotenv.config({ path: resolve(process.cwd(), '.env') });
@@ -261,6 +262,12 @@ bot.action(/confirm_tx_(.+)/, async (ctx) => {
 bot.action('cancel_tx', (ctx) => {
   ctx.editMessageText('❌ Amal bekor qilindi.');
 });
+
+// Tadbir tugaganda xodimlarga eslatma (bot.launch'ni kutmaydi — polling
+// promise'i bot to'xtaguncha tugamaydi).
+if (botToken && botToken !== 'BU_YERGA_TOKEN_YOZING') {
+  startEventReminders(bot, prisma, miniAppUrl);
+}
 
 bot.launch().then(async () => {
   console.log('🤖 Telegram Bot ishga tushdi...');

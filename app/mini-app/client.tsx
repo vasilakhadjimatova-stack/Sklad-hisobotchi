@@ -213,6 +213,12 @@ export default function MiniAppClient({
 
   useEffect(() => {
     setMounted(true)
+    // Botdagi "Tadbir tugadi" eslatmasidan kelinsa (?event=ID) — darhol shu tadbir
+    const wanted = Number(new URLSearchParams(window.location.search).get('event'))
+    if (wanted && eventCards.some(e => e.id === wanted)) {
+      setActiveEventId(wanted)
+      setView('event')
+    }
     const tg = window.Telegram?.WebApp
     if (tg) {
       tg.ready()
