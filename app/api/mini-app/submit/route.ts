@@ -6,6 +6,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { actionType, eventName, telegramId, telegramName, items, date } = body
+    // Tadbir kartochkasidan kelgan bo'lsa — ERP tadbir id'si (musbat butun son)
+    const erpEventId = Number.isInteger(body.erpEventId) && body.erpEventId > 0
+      ? body.erpEventId as number
+      : null
 
     if (!eventName || !items || items.length === 0 || !actionType) {
       return NextResponse.json({ error: "Ma'lumotlar to'liq emas" }, { status: 400 })
@@ -62,6 +66,7 @@ export async function POST(req: NextRequest) {
           eventName: eventName,
           totalPrice: entry.totalPrice,
           unitMode: unitMode,
+          erpEventId,
           createdAt: txDate
         }
       })
