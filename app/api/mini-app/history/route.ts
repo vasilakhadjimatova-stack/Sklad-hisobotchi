@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { syncErpExpenses } from '@/lib/erpExpenses'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,12 @@ export async function POST(req: NextRequest) {
       })
     }
     await prisma.transaction.delete({ where: { id: txId } })
+
+    // Tadbirning suv/kofe xarajati ERP'da ham kamaysin (fonda)
+    if (tx.erpEventId) {
+      syncErpExpenses(prisma, { eventIds: [tx.erpEventId] })
+        .catch(err => console.error('[erp-xarajat] bekor qilishdan keyin:', err))
+    }
 
     return NextResponse.json({ success: true })
   } catch (e) {

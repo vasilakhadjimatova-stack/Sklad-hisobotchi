@@ -61,3 +61,41 @@ export async function fetchErpEvents(from: string, to: string): Promise<ErpEvent
     clearTimeout(timer)
   }
 }
+
+// ── Tadbir xarajati (rentabellik): suv / kofe ──
+export type ErpExpenseCategory = 'water' | 'coffee'
+export type ErpExpenseLine = { category: ErpExpenseCategory; amount: number; note: string }
+export type ErpPushResult =
+  | { status: 'ok'; changed: boolean }
+  | { status: 'off' }
+  | { status: 'locked' | 'notfound' | 'error'; error: string }
+
+// Tadbirning sklad xarajatini ERP'ga yuboradi. ERP holatni o'rnatadi:
+// ro'yxatda yo'q modda o'chadi, qayta yuborish takrorlamaydi.
+export async function pushErpExpenses(eventId: number, lines: ErpExpenseLine[]): Promise<ErpPushResult> {
+  const base = (process.env.ERP_URL || '').trim().replace(/\/+$/, '')
+  const key = (process.env.ERP_API_KEY || '').trim()
+  if (!base || !key) return { status: 'off' }
+
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 8000)
+  try {
+    const res = await fetch(`${base}/api/sklad/expenses`, {
+      method: 'POST',
+      headers: { 'X-Api-Key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ event_id: eventId, lines }),
+      cache: 'no-store',
+      signal: ctrl.signal,
+    })
+    const data = await res.json().catch(() => null)
+    if (res.ok && data?.ok) return { status: 'ok', changed: !!data.changed }
+    const error = String(data?.error || `HTTP ${res.status}`).slice(0, 300)
+    if (res.status === 409 && data?.locked) return { status: 'locked', error }
+    if (res.status === 404) return { status: 'notfound', error }
+    return { status: 'error', error }
+  } catch (err) {
+    return { status: 'error', error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    clearTimeout(timer)
+  }
+}
