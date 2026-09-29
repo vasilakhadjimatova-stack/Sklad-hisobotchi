@@ -27,6 +27,9 @@ model Item {
   boxSize      Int           @default(1) // 1 katta pachkada nechta pachka (1 = katta pachka yo'q)
   boxUnit      String        @default("karobka") // katta pachka birligi nomi
   packOnly     Boolean       @default(false) // chiqim faqat pachkada (dona tanlovi ko'rsatilmaydi)
+  // ERP rentabelligiga qaysi modda bo'lib boradi: "water" (suv) | "coffee" (kofe) | null.
+  // Tadbirga qilingan shu mahsulot chiqimi ERP'da tadbir xarajati bo'lib yoziladi.
+  erpCategory  String?
   transactions Transaction[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -61,4 +64,16 @@ model EventReminder {
   erpEventId Int      @id
   sentTo     Int      @default(0) // nechta xodimga yetib bordi
   createdAt  DateTime @default(now())
+}
+
+// Tadbirning suv/kofe xarajati ERP'ga oxirgi marta nima deb yuborilgani.
+// Hisoblangan summa shundan farq qilsagina qayta yuboriladi.
+model ErpExpenseSync {
+  erpEventId Int      @id
+  eventName  String   @default("")
+  water      Int      @default(0)
+  coffee     Int      @default(0)
+  status     String   @default("ok") // ok | locked | notfound | error
+  error      String?
+  syncedAt   DateTime @default(now()) @updatedAt
 }

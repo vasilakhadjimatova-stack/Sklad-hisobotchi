@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { startEventReminders } from './reminders';
+import { syncErpExpenses } from '../lib/erpExpenses';
 
 // Load .env
 dotenv.config({ path: resolve(process.cwd(), '.env') });
@@ -262,6 +263,17 @@ bot.action(/confirm_tx_(.+)/, async (ctx) => {
 bot.action('cancel_tx', (ctx) => {
   ctx.editMessageText('❌ Amal bekor qilindi.');
 });
+
+// Tadbirga qilingan suv/kofe → ERP rentabelligi. Chiqim saqlanganda sayt
+// darhol yuboradi; bu esa qolgan hamma o'zgarishlarni (narx tuzatildi,
+// mahsulot moddasi o'zgardi, yuborishda xato bo'lgan) 5 daqiqada ushlaydi.
+const erpExpenseTick = () => {
+  syncErpExpenses(prisma)
+    .then(r => { if (r.status === 'done' && (r.sent || r.failed)) console.log(`[erp-xarajat] ${r.sent} yuborildi, ${r.failed} muammo`) })
+    .catch(err => console.error('[erp-xarajat] xato:', err));
+};
+setTimeout(erpExpenseTick, 30 * 1000);   // baza sxemasi moslashib olsin
+setInterval(erpExpenseTick, 5 * 60 * 1000);
 
 // Tadbir tugaganda xodimlarga eslatma (bot.launch'ni kutmaydi — polling
 // promise'i bot to'xtaguncha tugamaydi).

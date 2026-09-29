@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma';
 import { revalidatePath } from 'next/cache'
 import { resolveTxDate } from '@/lib/date'
 import { isPriced, unitPriceOf } from '@/lib/reprice'
+import { syncErpExpenses, isErpCategory } from '@/lib/erpExpenses'
 
 async function getAdminUser() {
   const telegramId = "admin_dashboard_user"
@@ -317,6 +318,9 @@ export async function repriceTakes(itemId: string, unitPrices: number[]) {
       await prisma.$transaction(updates.slice(i, i + 200))
     }
 
+    // Suv/kofe chiqimi tuzatilgan bo'lsa ERP rentabelligi ham yangilansin
+    syncErpExpenses(prisma).catch(err => console.error('[erp-xarajat] narx tuzatilgach:', err))
+
     revalidatePath('/narxlar')
     revalidatePath('/analytics')
     revalidatePath('/history')
@@ -325,5 +329,34 @@ export async function repriceTakes(itemId: string, unitPrices: number[]) {
   } catch (err) {
     console.error('repriceTakes:', err)
     return { error: "Narxni tuzatib bo'lmadi. Qaytadan urinib ko'ring." }
+  }
+}
+
+// Mahsulotning ERP rentabelligidagi moddasi: suv / kofe / yo'q.
+// O'zgarsa shu mahsulotning tadbirlarga qilingan chiqimi ERP'ga qayta yuboriladi.
+export async function setItemErpCategory(itemId: string, category: string | null) {
+  if (!itemId) return { error: "Mahsulot tanlanmadi" }
+  const erpCategory = isErpCategory(category) ? category : null
+  try {
+    await prisma.item.update({ where: { id: itemId }, data: { erpCategory } })
+    syncErpExpenses(prisma).catch(err => console.error('[erp-xarajat] modda o\'zgargach:', err))
+    revalidatePath('/rentabellik')
+    return { success: true }
+  } catch (err) {
+    console.error('setItemErpCategory:', err)
+    return { error: "Saqlab bo'lmadi" }
+  }
+}
+
+// "Hozir yuborish" — kutmasdan hamma tadbirlarni ERP bilan solishtirish
+export async function syncErpNow() {
+  try {
+    const res = await syncErpExpenses(prisma)
+    revalidatePath('/rentabellik')
+    if (res.status === 'off') return { error: "ERP ulanmagan (ERP_URL / ERP_API_KEY yo'q)" }
+    return { success: true, sent: res.sent, failed: res.failed }
+  } catch (err) {
+    console.error('syncErpNow:', err)
+    return { error: "Yuborishda xato" }
   }
 }

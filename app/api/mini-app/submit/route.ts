@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma';
 import { resolveTxDate } from '@/lib/date'
+import { syncErpExpenses } from '@/lib/erpExpenses'
 
 export async function POST(req: NextRequest) {
   try {
@@ -70,6 +71,12 @@ export async function POST(req: NextRequest) {
           createdAt: txDate
         }
       })
+    }
+
+    // Tadbirga suv/kofe olingan bo'lsa — ERP rentabelligiga darhol (fonda)
+    if (erpEventId) {
+      syncErpExpenses(prisma, { eventIds: [erpEventId] })
+        .catch(err => console.error('[erp-xarajat] chiqimdan keyin:', err))
     }
 
     return NextResponse.json({ success: true })

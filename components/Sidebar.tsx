@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, Users, Settings, BarChart3, History, ClipboardCheck, Trash2, BadgeDollarSign } from 'lucide-react'
+import { LayoutDashboard, Package, Users, Settings, BarChart3, History, ClipboardCheck, Trash2, BadgeDollarSign, TrendingUp } from 'lucide-react'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -14,6 +14,7 @@ export default function Sidebar() {
     { href: '/inventarizatsiya', label: 'Inventarizatsiya', icon: ClipboardCheck },
     { href: '/tozalash', label: 'Ombor tozalash', icon: Trash2 },
     { href: '/history', label: 'Amallar Tarixi', icon: History },
+    { href: '/rentabellik', label: 'Rentabellik (ERP)', icon: TrendingUp },
     { href: '/narxlar', label: 'Narxlarni tuzatish', icon: BadgeDollarSign },
     { href: '/users', label: 'Foydalanuvchilar', icon: Users },
   ]
